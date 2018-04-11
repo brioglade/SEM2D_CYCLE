@@ -42,7 +42,6 @@ while (abs(delta) > eps)
         k
         Vf
         tau
-        Vfrpos
         error('N-R search fails to converge');
     end
 end

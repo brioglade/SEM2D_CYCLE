@@ -8,9 +8,10 @@
 % b = 0.0191
 % L = 42 mm
 
+if ~restart
 %------------------------------------------
-clear all; close all;
-bound = 50;
+clearvars -except restart; close all;
+bound = 30;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
 % If IDinitCond = 1, use SCEC initial conditions
@@ -136,7 +137,7 @@ muMax = 0;                    % Used for variable time stepping
 
 %**** Set here the parameters of the time solver : ****
 %NT = 347;                     % number of timesteps
-CFL = 0.6;                     % stability number = CFL_1D / sqrt(2)
+CFL = 0.3;                     % stability number = CFL_1D / sqrt(2)
 %********
 
 dt = Inf;  			% timestep (set later)
@@ -267,7 +268,6 @@ Mq = M;
 M(BcLeftIglob)  = M(BcLeftIglob)  +half_dt*BcLeftC;
 M(BcRightIglob) = M(BcRightIglob) +half_dt*BcRightC;
 M(BcTopIglob) = M(BcTopIglob) + half_dt*BcTopC;
-
 
 %-- DYNAMIC FAULT at bottom boundary
 FaultNglob = NELX*(NGLL-1)+1;
@@ -529,13 +529,31 @@ v(FaultIglobBC,:) = 0;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% START OF TIME LOOP %%%%%%%%%%%%%%%%%%%%%%%%%
+
+end
+
+if restart
+    v = v_store;
+    d = d_store;
+    a = a_store;
+    psi=psi_store;
+    [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
+end
+
 while t < tmax,
+    dt
     it = it + 1;
     t = t + dt;
     time(it) = t;
     
-   % if isolver == 1
-    if true
+
+    if isolver == 1
+    v_store = v;
+    d_store = d;
+    a_store = a;
+    psi_store=psi;
+    dt_store = dt;   
+    %if true
     display('quasi solver');
     
     vPre = v;
@@ -561,19 +579,13 @@ while t < tmax,
     % update displacement of medium
     d(FaultNIglob,:) = dnew;
     
-%     subplot(2,1,1),scatter(x,y,10,d(:,1),'fill');
-%     subplot(2,1,2),scatter(x,y,10,d(:,2),'fill');
-%     pause;   
     % make d = F on the fault
     d(FaultIglob,:) = F(FaultIglob,:);
     
     % compute on-fault stress  
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1, coefint2);
-%     subplot(2,1,1),scatter(x,y,10,a(:,1),'fill');
-%     subplot(2,1,2),scatter(x,y,10,a(:,2),'fill');
-%     pause;
 
- %   a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
+    a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
     tau1 = -a(FaultIglob,:)./(FaultB);   
     
     % compute slip rates on fault
@@ -633,19 +645,175 @@ while t < tmax,
     
     d(FaultIglobBC,:) = 0;
     v(FaultIglobBC,:) = 0;
-    figure(1);
-     subplot(2,1,1);
-     scatter(x,y,10,d(:,1),'fill');
-     subplot(2,1,2);
-     scatter(x,y,10,d(:,2),'fill');
+  
+    %hold on
+    else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
+    display('Dynamic solver');
+    dPre = d;
+    vPre = v;
+    
+    % update
+    d = d + dt*v + half_dt_sq*a;
+    
+    % prediction
+    v = v + half_dt*a;
+    NGLOB = length(d);
+    NEL =length(iglob);
+    a=zeros(NGLOB,2);
+    ax = zeros(NGLOB,1);
+    az = zeros(NGLOB,1);
 
+    % internal forces -K*d(t+1)
+    % stored in global array 'a'
+    for e=1:NEL,               
+        %switch to local (element) representation
+        ig = iglob(:,:,e);
+        dx = d(:,1);
+        dz = d(:,2);
+        vx = v(:,1);
+        vz = v(:,2);
+        isETA = e<=NEL_ETA;
+        if isETA
+            local_x = dx(ig) +eta.*vx(ig); % Kelvin-Voigt viscosity
+            local_z = dz(ig) +eta.*vz(ig);
+        else
+            local_x = dx(ig) + 0.*dt*vx(ig); % Kelvin-Voigt viscosity
+            local_z = dz(ig) + 0.*dt*vz(ig);
+        end
+        %gradients wrt local variables (xi,eta)
+    %    d_xi  = Ht*local;
+    %    d_eta = local*H;
+        %element contribution to internal forces
+        %local = coefint1*H*( W(:,:,e).*d_xi ) + coefint2*( W(:,:,e).*d_eta )*Ht ;
+        wloc = W(:,:,e);
+        wlloc = Wl(:,:,e);
+        
+        dxxxx = H * ( (wloc + 2*wlloc) .* (Ht*local_x)) * coefint1; 
+        dzzzz = ((wloc + 2*wlloc) .* (local_z*H)) * Ht * coefint2;
+        dxxzz = H * (wlloc .* (local_z*H)); 
+        dzzxx = (wlloc .* (Ht*local_x)) * Ht;
+        
+        dxzxz = (wloc .* (local_x*H)) * Ht * coefint2;
+        dxzzx = (wloc .* (Ht*local_z)) * Ht;
+        dzxxz = H * (wloc .* (local_x*H));
+        dzxzx = H * (wloc .* (Ht*local_z)) * coefint1;
+        
+        
+        local_x = dxxxx + dxxzz + dxzxz + dxzzx;
+        local_z = dzzzz + dzzxx + dzxzx + dzxxz;
+        
+        %assemble into global vector
+        ax(ig) = ax(ig) - local_x;
+        az(ig) = az(ig) - local_z;
+    end
+    a(:,1) = ax;
+    a(:,2) = az;
+    a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
+    
+    % absorbing boundaries:
+%   a(BcLeftIglob)  = a(BcLeftIglob)  - BcLeftC  .* v(BcLeftIglob);
+%    a(BcRightIglob) = a(BcRightIglob) - BcRightC .* v(BcRightIglob);
+%    a(BcTopIglob)   = a(BcTopIglob)   - BcTopC   .* v(BcTopIglob);
+
+    %%%%%%%%%%% fault boundary condition: rate-state friction %%%%%%%%%%%%
+    
+    FaultVFree = 2*v(FaultIglob,:) + 2*half_dt*a(FaultIglob,:)./M(FaultIglob);   % times 2 due to the symmetry;
+    
+    % compute state variable using Vf from the previous time step
+    Vf = 2*vPre(FaultIglob,1) + Vpl;
+
+    for jF=1:FaultNglob-NFBC
+        j = jF + NFBC/2;
+        if IDstate == 1
+            psi1(j) = psi(j) + dt*((Vo(j)./xLf(j)).*exp(-psi(j)) - abs(Vf(j))./xLf(j));
+            
+        elseif IDstate == 2
+            % compute psi(t+dt) = psi0 + ln(1+FaultC(t+dt)) - FaultD/L
+            if (abs(Vf(j))*dt/xLf(j)) < 10^-5
+                psi1(j) = log(exp(psi(j)-abs(Vf(j))*dt/xLf(j)) + ...
+                    Vo(j)*dt/xLf(j)-0.5*Vo(j)*abs(Vf(j))*dt*dt/(xLf(j)*xLf(j)));
+            else
+                psi1(j) = log(exp(psi(j)-abs(Vf(j))*dt/xLf(j)) + ...
+                    (Vo(j)/abs(Vf(j)))*(1-exp(-abs(Vf(j))*dt/xLf(j))));
+            end
+        elseif IDstate == 3
+            psi1(j) = exp(-abs(Vf(j)).*dt./xLf(j)).*log(abs(Vf(j))./Vo(j)) + ...
+                exp(-abs(Vf(j)).*dt./xLf(j)).*psi(j) + log(Vo(j)./abs(Vf(j)));
+            if ~any(imag(psi1(j))) == 0
+                return
+            end
+        end
+     
+        % N-R search
+        tauNR(j) = tau(j) + tauo(j);
+        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j),...
+            tauNR(j),tauo(j),psi1(j),FaultZ(j),FaultVFree(j,1));
+        if Vf(j) > 10^10 || isnan(Vf(j)) == 1 || isnan(tau1(j)) == 1 
+            'NR search failed!'
+            return
+        end
+            
+        if IDstate == 1
+            psi2(j) = psi(j) + 0.5*dt*( ((Vo(j)/xLf(j))*exp(-psi(j)) - abs(Vf(j))/xLf(j))...
+                +((Vo(j)/xLf(j))*exp(-psi1(j)) - abs(Vf1(j))/xLf(j)) );            
+        elseif IDstate == 2
+            if (0.5*abs(Vf1(j)+Vf(j))*dt/xLf(j)) < 10^-6
+                psi2(j) = log(exp(psi(j)-0.5*abs(Vf1(j)+Vf(j))*dt/xLf(j)) + ...
+                    Vo(j)*dt/xLf(j)-0.5*Vo(j)*0.5*abs(Vf1(j)+Vf(j))*dt*dt/(xLf(j)*xLf(j)));
+            else
+                psi2(j) = log(exp(psi(j)-0.5*abs(Vf1(j)+Vf(j))*dt/xLf(j)) + ...
+                    (Vo(j)/(0.5*abs(Vf1(j)+Vf(j))))*(1-exp(-0.5*abs(Vf1(j)+Vf(j))*dt/xLf(j))));
+            end
+        elseif IDstate == 3
+            psi2(j) = exp(-0.5*abs(Vf1(j)+Vf(j)).*dt./xLf(j)).*log(0.5*abs(Vf1(j)+Vf(j))./Vo(j)) + ...
+                exp(-0.5*abs(Vf1(j)+Vf(j)).*dt./xLf(j)).*psi(j) + log(Vo(j)./(0.5*abs(Vf1(j)+Vf(j))));
+        end
+        % N-R search (2nd loop)
+        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j),...
+            tau1(j),tauo(j),psi2(j),FaultZ(j),FaultVFree(j));
+
+    end
+    
+    tau = tau2 - tauo;
+    tau(iFBC) = 0;
+    psi = psi2;
+    KD = a;
+    a(FaultIglob,1) = a(FaultIglob,1) - FaultB .*tau;
+    
+    %%%%%%%%%%%%%%%%%% the end of fault boundary condition %%%%%%%%%%%%%%%%
+    RHS = a;
+    
+    % solve for a_new:
+    a = a ./M ;
+
+    % correction
+    v = v + half_dt*a;
+    
+    v(FaultIglobBC,1) = 0;
+    a(FaultIglobBC,1) = 0;
+    
+    %% P_Ma based on max
+    P_Ma(it)=max(max(abs(M(FaultIglob).*a(FaultIglob))./abs(KD(FaultIglob))),max(abs(M(FaultIglob).*a(FaultIglob))./abs(FaultB.*tau)));  
+    
+    % compute residual
+    LHS = M.*a;  
+    RMS = sqrt(sum((RHS-LHS).^2)/length(RHS))./max(abs(RHS));
+    
+    end
+    figure(1);
+    subplot(2,1,1);
+    scatter(x,y,10,d(:,1),'fill');
+    subplot(2,1,2);
+    scatter(x,y,10,d(:,2),'fill');
     getframe;
     figure(2);
     plot(x(FaultIglob),log10(v(FaultIglob)));
     getframe;
-    %hold on
-    else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
-    end
+    hold on
+    figure(3);
+    plot(x(FaultIglob),(psi));
+    getframe;
+    hold on
     
     Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
         
@@ -937,7 +1105,7 @@ while t < tmax,
     end
     
     % compute next time step dt
-    [dt]=dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,1);
+    [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
     
 end % ... of time loop
 

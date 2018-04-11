@@ -16,7 +16,7 @@ if isolver == 1 % for quasi-static solver
     % and allowed slip in one time step:
     for iF=1:FaultNglob-NFBC;
         i = iF + NFBC/2;
-        absV = abs(Vf(i));
+        absV = abs(Vf(i,1));
         if (absV*dtmax > XiLf(i))   % velocity is not too small
             dtcell = XiLf(i)/(absV);  % then see whether cell i restrics the time step
             if (dtcell < dtnx)      % the factor 40 is added by ykaneko

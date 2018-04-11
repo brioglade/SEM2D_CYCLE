@@ -747,6 +747,17 @@ while t < tmax,
     RMS = sqrt(sum((RHS-LHS).^2)/length(RHS))./max(abs(RHS));
     
     end
+    figure(1);
+    scatter(x,y,10,d,'fill');
+    getframe;
+    figure(2);
+    plot(x(FaultIglob),log10(v(FaultIglob)));
+    getframe;
+    hold on
+    figure(3);
+    plot(x(FaultIglob),(psi));
+    getframe;
+    hold on
     
     Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
         
