@@ -40,11 +40,13 @@ for n = 1:4000
     p(:,:) = 0;
     p(NIglob,:) = pnew;
     %ResStore(n) = norm(rnew)/norm(Fnew);
-    if norm(rnew)/norm(Fnew) < 10^-5
+    if norm(rnew)/norm(Fnew) < 10^-6 && norm(rnew) < 1.0
         %'converged'
         %figure;
         %loglog([1:n],ResStore(1:n),'b.-');
         %axis([10^0 10^3 10^-4 10^0]);
+        
+        display(['norm:',num2str(norm(rnew)),',iterations:',num2str(n)]);
         break
     end
     if n == 4000 || norm(rnew)/norm(Fnew) > 10^10
