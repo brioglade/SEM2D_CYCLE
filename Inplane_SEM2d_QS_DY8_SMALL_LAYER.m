@@ -546,13 +546,13 @@ while t < tmax,
     t = t + dt;
     time(it) = t;
     
-
+        v_store = v;
+        d_store = d;
+        a_store = a;
+        psi_store=psi;
+        dt_store = dt;   
     if isolver == 1
-    v_store = v;
-    d_store = d;
-    a_store = a;
-    psi_store=psi;
-    dt_store = dt;   
+    
     %if true
     display('quasi solver');
     
@@ -800,20 +800,23 @@ while t < tmax,
     RMS = sqrt(sum((RHS-LHS).^2)/length(RHS))./max(abs(RHS));
     
     end
-    figure(1);
-    subplot(2,1,1);
-    scatter(x,y,10,d(:,1),'fill');
-    subplot(2,1,2);
-    scatter(x,y,10,d(:,2),'fill');
-    getframe;
-    figure(2);
-    plot(x(FaultIglob),log10(v(FaultIglob)));
-    getframe;
-    hold on
-    figure(3);
-    plot(x(FaultIglob),(psi));
-    getframe;
-    hold on
+    
+    if(mod(it,10) == 0)
+        figure(1);
+        subplot(2,1,1);
+        scatter(x,y,10,d(:,1),'fill');
+        subplot(2,1,2);
+        scatter(x,y,10,d(:,2),'fill');
+        getframe;
+        figure(2);
+        plot(x(FaultIglob),log10(v(FaultIglob)));
+        getframe;
+        hold on
+        figure(3);
+        plot(x(FaultIglob),(psi));
+        getframe;
+        hold on
+    end
     
     Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
         
