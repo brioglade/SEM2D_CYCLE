@@ -12,26 +12,32 @@ p(nglob,2) = 0;
 % first compute F = K21 d1, where d1 is incremental disp at fault node
 a = computeforce(iglob,W,Wl,H,Ht,F,coefint1,coefint2);               
 a(BcTopIglob,:) = 0;
-Fnew = -a(NIglob,:);      % make it F = -K21 d1 
+a(Iglob,1) = 0;
+Fnew = -a;      % make it F = -K21 d1 
 
-dd(NIglob,:) = dnew;
-dd(Iglob,:) = 0;
+dd(NIglob,:) = dnew(NIglob,:);
+dd(Iglob,2) = dnew(Iglob,2);
+dd(Iglob,1) = 0;
 % Solve d = K22^-1 * F by conjugate gradient
 % first compute residual based on initial guess, dd
 a = computeforce(iglob,W,Wl,H,Ht,dd,coefint1,coefint2);
 a(BcTopIglob,:) = 0;
-anew = a(NIglob,:);    %For fixed boundary
+anew(NIglob,:) = a(NIglob,:);    %For fixed boundary
+anew(Iglob,2) = a(Iglob,2);
+anew(Iglob,1) = 0;
 
 rnew = Fnew - anew;                   % initial residual F - K22 d2
 znew = rnew./diagKnew;
 pnew = znew;
 p(:) = 0;
-p(NIglob,:) = pnew;
+p(NIglob,:) = pnew(NIglob,:);
+p(Iglob,2) = pnew(Iglob,2);
    
 for n = 1:4000
     a = computeforce(iglob,W,Wl,H,Ht,p,coefint1,coefint2);
     a(BcTopIglob,:) = 0;
-    anew = a(NIglob,:);
+    anew(NIglob,:) = a(NIglob,:);
+    anew(Iglob,2) = a(Iglob,2);
     
     alpha = sum(diag(transpose(znew)*rnew))/sum(diag((transpose(pnew)*anew)));
     dnew = dnew + alpha*pnew;
@@ -42,7 +48,8 @@ for n = 1:4000
     beta = sum(diag(transpose(znew)*rnew))/sum(diag(transpose(z_old)*r_old));
     pnew = znew + beta*pnew;
     p(:,:) = 0;
-    p(NIglob,:) = pnew;
+    p(NIglob,:) = pnew(NIglob,:);
+    p(Iglob,2) = pnew(Iglob,2);
     %ResStore(n) = norm(rnew)/norm(Fnew);
     if norm(rnew)/norm(Fnew) < 10^-6 && norm(rnew) < 1.0
         %'converged'

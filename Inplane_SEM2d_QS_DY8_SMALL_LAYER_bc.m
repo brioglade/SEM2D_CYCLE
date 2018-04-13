@@ -11,7 +11,7 @@
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
-bound = 100;
+bound = 30;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
 % If IDinitCond = 1, use SCEC initial conditions
@@ -21,7 +21,7 @@ IDintitCond = 2;
 % If IDstate = 1, compute psi(t+dt) = psi(t) + dt * dpsi(t)/dt
 % If IDstate = 2, compute psi(t+dt) by integration with constant V
 % If IDstate = 3, compute psi(t+dt) of slip law by integration with constant V
-IDstate = 2;
+IDstate = 1;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -61,7 +61,7 @@ NGLL = P+1; % number of GLL nodes per element
 %[iglob,x,y] = MeshBox(LX,LY,NELX,NELY,NGLL);
 
 XGLL = GetGLL(NGLL);   % local cordinate of GLL quadrature points
-periodical = true;
+periodical = false;
 
 iglob = zeros(NGLL,NGLL,NELX*NELY);	% local to global index mapping
 nglob = (NELX*(NGLL-1)+(~periodical)*1)*(NELY*(NGLL-1)+1);	% number of global nodes
@@ -104,37 +104,6 @@ for ex=1:NELX,
 end
 end
 
-% for ey=1:NELY, 
-% for ex=1:NELX, 
-% 
-%   e = e+1;
-% 
-%  % Take care of redundant nodes at element edges :
-%   if e==1  % first element: bottom-left
-%     ig = reshape([1:NGLL*NGLL],NGLL,NGLL);    
-%   else
-%     if ey==1 	%  elements on first (bottom) row
-%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
-%       ig(2:NGLL,:) = last_iglob + igL; 		% the rest
-%     elseif ex==1 % elements on first (left) column
-%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
-%       ig(:,2:NGLL) = last_iglob + igB; 		% the rest
-%     else 	% other elements
-%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
-%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
-%       ig(2:NGLL,2:NGLL) = last_iglob + igLB;
-%     end
-%   end
-%   iglob(:,:,e) = ig;
-%   last_iglob = ig(NGLL,NGLL);
-% 
-%  % Global coordinates of the computational (GLL) nodes
-%   x(ig) = dxe*(ex-1)+xgll;
-%   y(ig) = dye*(ey-1)+ygll;
-% 
-%    
-% end
-% end    
 
 x = x-LX/2;
 nglob = length(x);
@@ -273,21 +242,22 @@ for ey=1:NELY,
     BcRightC(ip) = BcRightC(ip) + dy_deta*wgll*impedance ;
 end
 % Top
-ng = NELX*(NGLL-1)+1;
+ng = NELX*(NGLL-1)+(~periodical)*1;
 BcTopIglob = zeros(ng,1);
 BcTopCx = zeros(ng,1);
 BcTopCz = zeros(ng,1);
 for ex=1:NELX,
-    ip = (NGLL-1)*(ex-1)+[1:NGLL] ;
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-periodical*1] ;
     e = (NELY-1)*NELX+ex;
-    BcTopIglob(ip) = iglob(1:NGLL,NGLL,e);
+    BcTopIglob(ip) = iglob(1:NGLL-periodical*1,NGLL,e);
 %    if (ex < NELX/2)          % modified for layer case   
 %    impedance = RHO*VS1;
 %    else
     impedance = RHO*VS2;
+    impedance2 = RHO*VP2;
 %    end
-    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll*impedance ;
-    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll*impedance;
+    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-periodical)*impedance ;
+    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-periodical)*impedance2;
 end
 
 Mq = M;
@@ -343,17 +313,18 @@ if IDintitCond == 1
      
       
 elseif IDintitCond == 2
-    xshift = 10;
+    xshift = 0;
+    xcoord = FaultX-xshift;
     %-- Initial conditions smooth in time and space
     tauoBack = 70*10^6;
     tauo = repmat(tauoBack,FaultNglob,1);
     width = 2*3e3/distN;
-    isel = find(abs(FaultX)<=width/2);
+    isel = find(abs(xcoord)<=width/2);
     Peaktauo = 81.6*10^6;
     Amplitude = (Peaktauo-tauoBack)/2;
     tauo(isel) = (Peaktauo+tauoBack)/2 ...
-        + Amplitude*cos(2*pi*(FaultX(isel)-xshift)/width);
-    isel2 = find(abs(FaultX)>10e3/distN);
+        + Amplitude*cos(2*pi*(xcoord(isel))/width);
+    isel2 = find(abs(xcoord)>10e3/distN);
     
     ccbOut = 0.0097;
     ccbIn = 0.0191; 
@@ -361,10 +332,10 @@ elseif IDintitCond == 2
     ccb(isel2) = ccbOut;
     Amplitude2 = (ccbIn + ccbOut)/2;
     Amplitude3 = (ccbIn - ccbOut)/2;
-    isel3 = find(FaultX>=8e3/distN&FaultX<=(8e3/distN+width/2));
-    ccb(isel3)=Amplitude2 + Amplitude3*cos(2*pi*(FaultX(isel3)-8e3)/width);
-    isel4 = find(FaultX<=-8e3/distN&FaultX>=-(8e3/distN+width/2));
-    ccb(isel4)=Amplitude2 + Amplitude3*cos(2*pi*(FaultX(isel4)+8e3)/width);
+    isel3 = find(xcoord>=8e3/distN&xcoord<=(8e3/distN+width/2));
+    ccb(isel3)=Amplitude2 + Amplitude3*cos(2*pi*(xcoord(isel3)-8e3)/width);
+    isel4 = find(xcoord<=-8e3/distN&xcoord>=-(8e3/distN+width/2));
+    ccb(isel4)=Amplitude2 + Amplitude3*cos(2*pi*(xcoord(isel4)+8e3)/width);
     tau = repmat(0,FaultNglob,1);
     psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(2*v(FaultIglob)./Vo);
     psi0 = psi;
@@ -501,11 +472,11 @@ vPre = zeros(nglob,2);
 dd = zeros(nglob,2);
 dacum = zeros(nglob,2);
 
-dnew = zeros(length(FaultNIglob),2);	
-Fnew = zeros(length(FaultNIglob),2);	
-anew = zeros(length(FaultNIglob),2);	
-rnew = zeros(length(FaultNIglob),2);	
-pnew = zeros(length(FaultNIglob),2);	 
+dnew = zeros(nglob,2);	
+Fnew = zeros(nglob,2);	
+anew = zeros(nglob,2);	
+rnew = zeros(nglob,2);	
+pnew = zeros(nglob,2);	 
 
 %------------------------------------------
 % STEP 3: SOLVER  M*a = -K*d +F
@@ -601,36 +572,38 @@ while t < tmax,
     
     Vf0 = 2*v(FaultIglob,1) + Vpl;
     Vf = Vf0;
-    
+    figure(4);
     for p1=1:2
     
     % compute the forcing term F
     F(:,:) = 0;
-    F(FaultIglob,:) = dPre(FaultIglob,:) + v(FaultIglob,:)*dt;
+    F(FaultIglob,1) = dPre(FaultIglob,1) + v(FaultIglob,1)*dt;
     
     % assign previous solution of the disp field as an initial guess
-    dnew = d(FaultNIglob,:);
+    dnew(FaultNIglob,:) = d(FaultNIglob,:);
+    dnew(FaultIglob,2) = d(FaultIglob,2);
     
 
-    [dnew,n1(p1)]=myPCGnew3(coefint1,coefint2,diagKnew,dnew,F,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,x,y);
+    [dnew,n1(p1)]=myPCGnew4(coefint1,coefint2,Kdiag,dnew,F,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,BcTopIglob, x,y);
     
    
     % update displacement of medium
-    d(FaultNIglob,:) = dnew;
+    d(FaultNIglob,:) = dnew(FaultNIglob,:);
+    d(FaultIglob, 2) = dnew(FaultIglob,2);
     
     % make d = F on the fault
-    d(FaultIglob,:) = F(FaultIglob,:);
+    d(FaultIglob,1) = F(FaultIglob,1);
     
     % compute on-fault stress  
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1, coefint2);
 
     a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
-    tau1 = -a(FaultIglob,:)./(FaultB);   
+    tau1 = -a(FaultIglob,1)./(FaultB);   
     
     % compute slip rates on fault
-    for jF=1:FaultNglob
-        j = jF ;
+    for jF=1:FaultNglob-NFBC
+        j = jF + NFBC/2 ;
         if IDstate == 1
             psi1(j) = psi(j) + dt*((Vo(j)./xLf(j)).*exp(-psi(j)) - abs(Vf(j))./xLf(j));    
         elseif IDstate == 2
@@ -659,8 +632,9 @@ while t < tmax,
     end
     Vf1(iFBC) = Vpl;
     Vf = (Vf0+Vf1)/2;
-    v(FaultIglob) = 0.5*Vf-0.5*Vpl;
-    
+    v(FaultIglob,1) = 0.5*Vf-0.5*Vpl;
+    plot(x(FaultIglob), log10(v(FaultIglob,1)));
+    hold on
     end
     %[n1(1) n1(2)]
     psi = psi1;
@@ -668,9 +642,15 @@ while t < tmax,
     tau(iFBC) = 0;
     Vf1(iFBC) = Vpl;
     
-    v(FaultIglob) = 0.5*Vf1-0.5*Vpl;
-    v(FaultNIglob) = (d(FaultNIglob)-dPre(FaultNIglob))/dt;
+    v(FaultIglob,1) = 0.5*Vf1-0.5*Vpl;
+    v(FaultNIglob,:) = (d(FaultNIglob,:)-dPre(FaultNIglob,:))/dt;
+    v(FaultNIglob,:) = 2*v(FaultNIglob,:) -  vPre(FaultNglob,:);
     
+    plot(x(FaultIglob), log10(v(FaultIglob,1)));
+    hold off
+    figure(5)
+    plot(x(FaultIglob), tauAB(FaultIglob)./Seff);
+    hold on
     RHS = a;
     RHS(FaultIglob,:) = RHS(FaultIglob,:) - FaultB.*tau;    
     RMS = sqrt(sum((RHS(:)).^2)/length(RHS(:)))./max(abs(RHS(:)));
@@ -685,7 +665,9 @@ while t < tmax,
     
     d(FaultIglobBC,:) = 0;
     v(FaultIglobBC,:) = 0;
-  
+    if(it == 759)
+        stop;
+    end
     %hold on
     else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
     display('Dynamic solver');
@@ -749,12 +731,12 @@ while t < tmax,
     a(:,1) = ax;
     a(:,2) = az;
     a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
-    
+    a(BcTopIglob,:) = 0;
     % absorbing boundaries:
 %   a(BcLeftIglob)  = a(BcLeftIglob)  - BcLeftC  .* v(BcLeftIglob);
 %    a(BcRightIglob) = a(BcRightIglob) - BcRightC .* v(BcRightIglob);
-    a(BcTopIglob,1)   = a(BcTopIglob,1)   - BcTopCx   .* v(BcTopIglob,1);
-    a(BcTopIglob,2)   = a(BcTopIglob,2)   - BcTopCz   .* v(BcTopIglob,2);
+%    a(BcTopIglob,1)   = a(BcTopIglob,1)   - BcTopCx   .* v(BcTopIglob,1);
+%    a(BcTopIglob,2)   = a(BcTopIglob,2)   - BcTopCz   .* v(BcTopIglob,2);
 
     %%%%%%%%%%% fault boundary condition: rate-state friction %%%%%%%%%%%%
     
@@ -825,13 +807,13 @@ while t < tmax,
     RHS = a;
     
     % solve for a_new:
-    a = a ./[Mx,Mz] ;
+    a = a ./M ;
 
     % correction
     v = v + half_dt*a;
     
-    v(FaultIglobBC,1) = 0;
-    a(FaultIglobBC,1) = 0;
+    %v(FaultIglobBC,1) = 0;
+    %a(FaultIglobBC,1) = 0;
     
     %% P_Ma based on max
     P_Ma(it)=max(max(abs(M(FaultIglob).*a(FaultIglob))./abs(KD(FaultIglob))),max(abs(M(FaultIglob).*a(FaultIglob))./abs(FaultB.*tau)));  
@@ -865,7 +847,7 @@ while t < tmax,
         getframe;
         figure(2);
         A = [2:length(FaultIglob),1];
-        plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A)));log10(v(FaultIglob(A)))],c);
+        plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
         getframe;
         hold on
         figure(3);

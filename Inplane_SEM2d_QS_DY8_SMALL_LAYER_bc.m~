@@ -11,7 +11,7 @@
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
-bound = 100;
+bound = 30;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
 % If IDinitCond = 1, use SCEC initial conditions
@@ -61,7 +61,7 @@ NGLL = P+1; % number of GLL nodes per element
 %[iglob,x,y] = MeshBox(LX,LY,NELX,NELY,NGLL);
 
 XGLL = GetGLL(NGLL);   % local cordinate of GLL quadrature points
-periodical = true;
+periodical = false;
 
 iglob = zeros(NGLL,NGLL,NELX*NELY);	% local to global index mapping
 nglob = (NELX*(NGLL-1)+(~periodical)*1)*(NELY*(NGLL-1)+1);	% number of global nodes
@@ -104,37 +104,6 @@ for ex=1:NELX,
 end
 end
 
-% for ey=1:NELY, 
-% for ex=1:NELX, 
-% 
-%   e = e+1;
-% 
-%  % Take care of redundant nodes at element edges :
-%   if e==1  % first element: bottom-left
-%     ig = reshape([1:NGLL*NGLL],NGLL,NGLL);    
-%   else
-%     if ey==1 	%  elements on first (bottom) row
-%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
-%       ig(2:NGLL,:) = last_iglob + igL; 		% the rest
-%     elseif ex==1 % elements on first (left) column
-%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
-%       ig(:,2:NGLL) = last_iglob + igB; 		% the rest
-%     else 	% other elements
-%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
-%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
-%       ig(2:NGLL,2:NGLL) = last_iglob + igLB;
-%     end
-%   end
-%   iglob(:,:,e) = ig;
-%   last_iglob = ig(NGLL,NGLL);
-% 
-%  % Global coordinates of the computational (GLL) nodes
-%   x(ig) = dxe*(ex-1)+xgll;
-%   y(ig) = dye*(ey-1)+ygll;
-% 
-%    
-% end
-% end    
 
 x = x-LX/2;
 nglob = length(x);
@@ -273,22 +242,22 @@ for ey=1:NELY,
     BcRightC(ip) = BcRightC(ip) + dy_deta*wgll*impedance ;
 end
 % Top
-ng = NELX*(NGLL-1);
+ng = NELX*(NGLL-1)+(~periodical)*1;
 BcTopIglob = zeros(ng,1);
 BcTopCx = zeros(ng,1);
 BcTopCz = zeros(ng,1);
 for ex=1:NELX,
-    ip = (NGLL-1)*(ex-1)+[1:NGLL-1] ;
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-periodical*1] ;
     e = (NELY-1)*NELX+ex;
-    BcTopIglob(ip) = iglob(1:NGLL-1,NGLL,e);
+    BcTopIglob(ip) = iglob(1:NGLL-periodical*1,NGLL,e);
 %    if (ex < NELX/2)          % modified for layer case   
 %    impedance = RHO*VS1;
 %    else
     impedance = RHO*VS2;
     impedance2 = RHO*VP2;
 %    end
-    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-1)*impedance ;
-    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-1)*impedance2;
+    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-periodical)*impedance ;
+    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-periodical)*impedance2;
 end
 
 Mq = M;
@@ -344,7 +313,7 @@ if IDintitCond == 1
      
       
 elseif IDintitCond == 2
-    xshift = 10;
+    xshift = 0;
     xcoord = FaultX-xshift;
     %-- Initial conditions smooth in time and space
     tauoBack = 70*10^6;
@@ -603,12 +572,12 @@ while t < tmax,
     
     Vf0 = 2*v(FaultIglob,1) + Vpl;
     Vf = Vf0;
-    
+    figure(4);
     for p1=1:2
     
     % compute the forcing term F
     F(:,:) = 0;
-    F(FaultIglob,:) = dPre(FaultIglob,:) + v(FaultIglob,:)*dt;
+    F(FaultIglob,1) = dPre(FaultIglob,1) + v(FaultIglob,:)*dt;
     
     % assign previous solution of the disp field as an initial guess
     dnew = d(FaultNIglob,:);
@@ -628,11 +597,11 @@ while t < tmax,
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1, coefint2);
 
     a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
-    tau1 = -a(FaultIglob,:)./(FaultB);   
+    tau1 = -a(FaultIglob,1)./(FaultB);   
     
     % compute slip rates on fault
-    for jF=1:FaultNglob
-        j = jF ;
+    for jF=1:FaultNglob-NFBC
+        j = jF + NFBC/2 ;
         if IDstate == 1
             psi1(j) = psi(j) + dt*((Vo(j)./xLf(j)).*exp(-psi(j)) - abs(Vf(j))./xLf(j));    
         elseif IDstate == 2
@@ -661,8 +630,9 @@ while t < tmax,
     end
     Vf1(iFBC) = Vpl;
     Vf = (Vf0+Vf1)/2;
-    v(FaultIglob) = 0.5*Vf-0.5*Vpl;
-    
+    v(FaultIglob,1) = 0.5*Vf-0.5*Vpl;
+    plot(x(FaultIglob), log10(v(FaultIglob,1)));
+    hold on
     end
     %[n1(1) n1(2)]
     psi = psi1;
@@ -671,8 +641,14 @@ while t < tmax,
     Vf1(iFBC) = Vpl;
     
     v(FaultIglob,1) = 0.5*Vf1-0.5*Vpl;
-    v(FaultNIglob,1) = (d(FaultNIglob,1)-dPre(FaultNIglob,1))/dt;
+    v(FaultNIglob,:) = (d(FaultNIglob,:)-dPre(FaultNIglob,:))/dt;
+    v(FaultNIglob,:) = 2*v(FaultNIglob,:) -  vPre(FaultNglob,:);
     
+    plot(x(FaultIglob), log10(v(FaultIglob,1)));
+    hold off
+    figure(5)
+    plot(x(FaultIglob), tauAB(FaultIglob)./Seff);
+    hold on
     RHS = a;
     RHS(FaultIglob,:) = RHS(FaultIglob,:) - FaultB.*tau;    
     RMS = sqrt(sum((RHS(:)).^2)/length(RHS(:)))./max(abs(RHS(:)));
