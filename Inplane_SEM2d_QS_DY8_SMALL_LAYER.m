@@ -514,7 +514,7 @@ pnew = zeros(length(FaultNIglob),2);
 % Explicit Newmark scheme with
 % alpha=1, beta=0, gamma=1/2
 %
-isolver = 1;   % initially, 1 for quasistatic, 2 for dynamic
+isolver = 2;   % initially, 1 for quasistatic, 2 for dynamic
 go_snap = 0;
 go_snapDY = 0;
 
@@ -580,7 +580,7 @@ if restart
     [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
 end
 [dt]=dtevol(0.001,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
-
+dt = 0.04;
 while t < tmax,
     dt
     it = it + 1;
@@ -721,8 +721,8 @@ while t < tmax,
             local_x = dx(ig) +eta.*vx(ig); % Kelvin-Voigt viscosity
             local_z = dz(ig) +eta.*vz(ig);
         else
-            local_x = dx(ig) + 0.1*dt*vx(ig); % Kelvin-Voigt viscosity
-            local_z = dz(ig) + 0.1*dt*vz(ig);
+            local_x = dx(ig);% + 0.1*dt*vx(ig); % Kelvin-Voigt viscosity
+            local_z = dz(ig);% + 0.1*dt*vz(ig);
         end
         %gradients wrt local variables (xi,eta)
     %    d_xi  = Ht*local;
@@ -849,7 +849,7 @@ while t < tmax,
     if(isolver==1)
         everyN = 1;
     else
-        everyN = 100;
+        everyN = 10;
     end
     
     if(mod(it,everyN) == 0)
@@ -1162,7 +1162,7 @@ while t < tmax,
     % Determine quasi-static or dynamic regime based on max slip velocity
     if (isolver == 1 && Vfmax < 5*10^-3) || ...
             (isolver == 2 && Vfmax < 2*10^-3)
-       isolver = 1;
+       isolver = 2;
     else
        isolver = 2;
     end

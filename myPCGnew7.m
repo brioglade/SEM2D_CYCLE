@@ -1,4 +1,4 @@
- function [dnew,n] = myPCGnew7(coefint1,coefint2,diagKnew,dnew,F,slip,Iglob,NIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary,x,y);
+ function [dnew,n] = myPCGnew7(coefint1,coefint2,diagKnew,dnew,F,slip,Iglob,NIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary,x,y,tolerance);
 
 % input: 
 
@@ -9,7 +9,7 @@ a(nglob,2) = 0;
 dd(nglob,2) = 0;
 p(nglob,2) = 0;
 
-dnew = 0*dnew;
+dnew = dnew;
 % first compute F = K21 d1, where d1 is incremental disp at fault node
 %a = computeforce_combine_force(iglob,W,Wl,H,Ht,F,Iglob,coefint1,coefint2);
 a = F;
@@ -35,7 +35,7 @@ error0 = norm(rnew);
 %p(Iglob,2) = pnew(Iglob,2);
    
 for n = 1:4000
-    norm(rnew)
+%    norm(rnew)
     a = computeforce_slip_boundary(iglob,W,Wl,H,Ht,p,slip*0,Iglob, coefint1,coefint2);
     a(FixBoundary,:) = 0;
     anew = a;
@@ -51,7 +51,7 @@ for n = 1:4000
     p(:,:) = 0;
     p = pnew;
     %ResStore(n) = norm(rnew)/norm(Fnew);
-    if norm(rnew)/error0 < 10^-6 && norm(rnew) < 1.0
+    if norm(rnew)/error0 < 10^-6 && norm(rnew) < tolerance
         %'converged'
         %figure;
         %loglog([1:n],ResStore(1:n),'b.-');
@@ -68,3 +68,6 @@ for n = 1:4000
         return
     end
 end
+% reconstruct the other half of the slip boundary;
+dnew(Iglob(:,1),1) = dnew(Iglob(:,2),1) + slip;
+dnew(Iglob(:,1),2) = dnew(Iglob(:,2),2);

@@ -21,7 +21,7 @@ IDintitCond = 2;
 % If IDstate = 1, compute psi(t+dt) = psi(t) + dt * dpsi(t)/dt
 % If IDstate = 2, compute psi(t+dt) by integration with constant V
 % If IDstate = 3, compute psi(t+dt) of slip law by integration with constant V
-IDstate = 1;
+IDstate = 2;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -217,8 +217,8 @@ for ey=1:NELY,
         ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS2^2;   
-        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS1^2;   
+        ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         end
         if muMax < max(max(mu)); muMax = max(max(mu)); end;
         
@@ -302,22 +302,22 @@ for ey=1:NELY,
     BcRightC(ip) = BcRightC(ip) + dy_deta*wgll*impedance ;
 end
 % Top
-ng = NELX*(NGLL-1);
+ng = NELX*(NGLL-1)+(~periodical);
 BcTopIglob = zeros(ng,1);
 BcTopCx = zeros(ng,1);
 BcTopCz = zeros(ng,1);
 for ex=1:NELX,
-    ip = (NGLL-1)*(ex-1)+[1:NGLL-1] ;
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-1+(~periodical)] ;
     e = (NELY-1)*NELX+ex;
-    BcTopIglob(ip) = iglob(1:NGLL-1,NGLL,e);
+    BcTopIglob(ip) = iglob(1:NGLL-1+(~periodical),NGLL,e);
 %    if (ex < NELX/2)          % modified for layer case   
 %    impedance = RHO*VS1;
 %    else
     impedance = RHO*VS2;
     impedance2 = RHO*VP2;
 %    end
-    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-1)*impedance ;
-    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-1)*impedance2;
+%    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance ;
+%    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance2;
 end
 
 ng = NELX*(NGLL-1);
@@ -325,19 +325,18 @@ BcBotIglob = zeros(ng,1);
 BcBotCx = zeros(ng,1);
 BcBotCz = zeros(ng,1);
 for ex=1:NELX,
-    ip = (NGLL-1)*(ex-1)+[1:NGLL-1] ;
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-1+(~periodical)] ;
     e = ex;
-    BcBotIglob(ip) = iglob(1:NGLL-1,1,e);
+    BcBotIglob(ip) = iglob(1:NGLL-1+(~periodical),1,e);
 %    if (ex < NELX/2)          % modified for layer case   
 %    impedance = RHO*VS1;
 %    else
     impedance = RHO*VS2;
     impedance2 = RHO*VP2;
 %    end
-    BcBotCx(ip) = BcBotCx(ip) + dx_dxi*wgll(1:end-1)*impedance ;
-    BcBotCz(ip) = BcBotCz(ip) + dx_dxi*wgll(1:end-1)*impedance2;
+%    BcBotCx(ip) = BcBotCx(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance ;
+%    BcBotCz(ip) = BcBotCz(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance2;
 end
-FixBoundary = [BcTopIglob,BcBotIglob];
 Mq = M;
 % % The mass matrix needs to be modified at the boundary
 % % for the IMPLICIT treatment of the term C*v.
@@ -393,6 +392,7 @@ psi2 = repmat(0,FaultNglob,1);
 tau1 = repmat(0,FaultNglob,1);
 tau2 = repmat(0,FaultNglob,1);
 tau3 = repmat(0,FaultNglob,1);
+sigma1 = repmat(0,FaultNglob,1);
 tauNR = repmat(0,FaultNglob,1);
 tauAB = repmat(0,FaultNglob,1);         % USED FOR QUASISTATIC
 
@@ -400,7 +400,7 @@ if IDintitCond == 1
      
       
 elseif IDintitCond == 2
-    xshift = 10;
+    xshift = 0;
     xcoord = FaultX-xshift;
     %-- Initial conditions smooth in time and space
     tauoBack = 70*10^6;
@@ -424,7 +424,7 @@ elseif IDintitCond == 2
     isel4 = find(xcoord<=-8e3/distN&xcoord>=-(8e3/distN+width/2));
     ccb(isel4)=Amplitude2 + Amplitude3*cos(2*pi*(xcoord(isel4)+8e3)/width);
     tau = repmat(0,FaultNglob,1);
-    psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(2*v(FaultIglob)./Vo);
+    psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(abs(v(FaultIglob(:,2))-v(FaultIglob(:,1)))./Vo);
     psi0 = psi;
 
 end
@@ -606,7 +606,8 @@ for e=1:NEL, % FOR EACH ELEMENT ...
     Kdiagx(ig) = Kdiagx(ig) + Klocdiagx(:,:);
     Kdiagz(ig) = Kdiagz(ig) + Klocdiagz(:,:);
 end
-Kdiagz(FaultIglob(:,1)) = Kdiagz(FaultIglob(:,1))+Kdiagz(FaultIglob(:,2));% assemble normal direction 
+Kdiagz(FaultIglob(:,2)) = Kdiagz(FaultIglob(:,1))+Kdiagz(FaultIglob(:,2));% assemble normal direction 
+Kdiagx(FaultIglob(:,2)) = Kdiagx(FaultIglob(:,1))+Kdiagx(FaultIglob(:,2));
 %since uz(fault+) = uz(fault-)
 Kdiag(:,1) = Kdiagx;
 Kdiag(:,2) = Kdiagz;
@@ -615,6 +616,9 @@ diagKnew(FaultNIglob,:) = Kdiag(FaultNIglob,:);
 v(LEFT,1) = v(LEFT,1) + 0.5*Vpl;
 v(RIGHT,1) = v(RIGHT,1) - 0.5*Vpl;
 Vf = v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1);
+
+
+
 %slip velocity 
 iFBC = find(abs(FaultX)>=bound*10^3/distN);
 NFBC = length(iFBC);
@@ -641,9 +645,13 @@ for ex = 1:NELX
        end
     end        
 end
-FaultIglobBC = FaultIglobBC(1:NFBC,:);
+%FaultIglobBC = FaultIglobBC(1:NFBC,:);
 v(FaultIglobBC(:,1),:) = 0;
 v(FaultIglobBC(:,2),:) = 0;
+FixBoundary = [BcTopIglob',BcBotIglob',FaultIglobBC(:)'];
+%recalculate the slip velocity due to bimaterial effect ( asymmetry).
+[v,~]=myPCGnew7(coefint1,coefint2,Kdiag,v,zeros(nglob,2),Vf,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1.0);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% START OF TIME LOOP %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -657,7 +665,7 @@ if restart
     psi=psi_store;
     [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
 end
-[dt]=dtevol(0.001,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
+[dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
 
 while t < tmax,
     dt
@@ -671,50 +679,22 @@ while t < tmax,
         psi_store=psi;
         dt_store = dt;
         
-     v_estimate = v; % make an initial guess
+     
     if isolver == 1
-    
-    %if true
+        
     display('quasi solver');
     
     vPre = v;
     dPre = d;
     
-    Vf0 = abs(v_es(FaultIglob(:,1),1) - v(FaultIglob(:,2),1))  + Vpl;
-    Vf = Vf0;
+    
+    
     
     for p1=1:2
-    
-    % compute the forcing term F
-    F(:,:) = 0;
-    F(FaultIglob,:) = dPre(FaultIglob,:) + v(FaultIglob,:)*dt;
-%    F(FaultIglob(:,1),1) = sin(0.2*x(FaultIglob(:,1))); testing
-%    F(FaultIglob(:,2),1) = cos(0.2*x(FaultIglob(:,1)));
-    F(FaultIglob(:,2),2) = 0;
-    % assign previous solution of the disp field as an initial guess
-    dnew(FaultNIglob,:) = d(FaultNIglob,:);
-    
-
-    [dnew,n1(p1)]=myPCGnew5(coefint1,coefint2,Kdiag,dnew,F,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y);
-    
-   
-    % update displacement of medium
-    d(FaultNIglob,:) = dnew(FaultNIglob,:);
-    d(FaultIglob(:,1),2) = dnew(FaultIglob(:,1),2);
-    
-    % make d = F on the fault
-    d(FaultIglob,1) = F(FaultIglob,1);
-    
-    % compute on-fault stress  
-    a = computeforce(iglob,W,Wl,H,Ht,d,coefint1, coefint2);
-
-    a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
-    tau1 = 0.5*(a(FaultIglob(:,1),1) - a(FaultIglob(:,2),1))./(FaultB);  
-   % sigma1 = a(FaultIglob,2)./(FaultB);
-    
-    % compute slip rates on fault
-    for jF=1:FaultNglob
+        
+        
+        %first step calculate vslip
+     for jF=1:FaultNglob
         j = jF ;
         if IDstate == 1
             psi1(j) = psi(j) + dt*((Vo(j)./xLf(j)).*exp(-psi(j)) - abs(Vf(j))./xLf(j));    
@@ -736,40 +716,62 @@ while t < tmax,
             end
         end
         tauAB(j) = tau1(j) + tauo(j);
-        fa = tauAB(j)/(Seff(j)*cca(j));
+        fa = tauAB(j)/((Seff(j)+sigma1(j))*cca(j));
         help = -(fo(j)+ccb(j)*psi1(j))/cca(j);
         help1 = exp(help+fa);
         help2 = exp(help-fa);
         Vf1(j) = Vo(j)*(help1 - help2);     
+        %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
+        % compute shear stress
+        %tau1(j) =tauAB(j) -  tauo(j);   
     end
-    Vf1(iFBC) = Vpl;
-    Vf = (Vf0+Vf1)/2;
-    v(FaultIglob) = 0.5*Vf-0.5*Vpl;
+    % compute the forcing term F
+    %F(FaultIglob(:,1),1) = -tau1.*FaultB;
+    %F(FaultIglob(:,2),1) = tau1.*FaultB;
+    %F(FaultIglob(:,2),2) = 0;
+    % assign previous solution of the disp field as an initial guess
+    %dnew = d;
     
+
+    [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt);
+    
+    %vnew(FaultIglob(:,1),1) = vnew(FaultIglob(:,2),1) + Vpl; % this is enforced 
+    %in the previous PCG solver;
+    
+    % update displacement of medium
+    % to ensure second order accuracy;
+    d = dPre + 0.5*dt*(vnew + vPre); 
+    a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);
+    tau1 = -a(FaultIglob(:,1),1)./FaultB;
+    %generate new prediction for tau and sigma;
+    sigma1 = a(FaultIglob(:,1),2)./FaultB;
+ %   d(FaultIglob(:,1),2) = dnew(FaultIglob(:,1),2);
+    Vf = (Vf + Vf1)/2;
+    v = vnew;
+%    Vf = abs(v(FaultIglob1(:,1),1) - v(FaultIglob1(:,2),1)) + Vpl;
     end
     %[n1(1) n1(2)]
     psi = psi1;
     tau = tau1;
-    tau(iFBC) = 0;
-    Vf1(iFBC) = Vpl;
+   
     
-    v(FaultIglob,1) = 0.5*Vf1-0.5*Vpl;
-    v(FaultNIglob,1) = (d(FaultNIglob,1)-dPre(FaultNIglob,1))/dt;
+  
     
-    RHS = a;
-    RHS(FaultIglob,:) = RHS(FaultIglob,:) - FaultB.*tau;    
-    RMS = sqrt(sum((RHS(:)).^2)/length(RHS(:)))./max(abs(RHS(:)));
+%    RHS = a;
+ %   RHS(FaultIglob,:) = RHS(FaultIglob,:) - FaultB.*tau;    
+ %   RMS = sqrt(sum((RHS(:)).^2)/length(RHS(:)))./max(abs(RHS(:)));
     
-    aeff = (v(FaultIglob,:) - vPre(FaultIglob,:))./dt;
-    Maeff = [Mq(FaultIglob),Mq(FaultIglob)].*aeff;
+ %   aeff = (v(FaultIglob,:) - vPre(FaultIglob,:))./dt;
+ %   Maeff = [Mq(FaultIglob),Mq(FaultIglob)].*aeff;
     
     %% P_Ma based on max
-    P_Ma(it)=max(max(max(abs(Maeff)./abs(a(FaultIglob)))),max(max(abs(Maeff)./(abs(FaultB.*tau)))));
+ %   P_Ma(it)=max(max(max(abs(Maeff)./abs(a(FaultIglob)))),max(max(abs(Maeff)./(abs(FaultB.*tau)))));
    
     a(:,:) = 0;
     
-    d(FaultIglobBC,:) = 0;
-    v(FaultIglobBC,:) = 0;
+%   d(FaultIglobBC,:) = 0;
+%    v(FaultIglobBC,:) = 0;
     if(it == 759)
         stop;
     end
@@ -845,7 +847,7 @@ while t < tmax,
 
     %%%%%%%%%%% fault boundary condition: rate-state friction %%%%%%%%%%%%
     
-    FaultVFree = 2*v(FaultIglob,:) + 2*half_dt*a(FaultIglob,:)./M(FaultIglob);   % times 2 due to the symmetry;
+    FaultVFree = 2*v(FaultIglob(FaultIglob(:,2),:) + 2*half_dt*a(FaultIglob,:)./M(FaultIglob);   % times 2 due to the symmetry;
     
     % compute state variable using Vf from the previous time step
     Vf = 2*vPre(FaultIglob,1) + Vpl;
@@ -961,27 +963,27 @@ while t < tmax,
         hold on
     end
     
-    Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
-        
-    % Output variables at 0km, 3km, 6km and 9km for every time step
-    Vloc1(it) = 2*v(OUTiglobLoc1) + Vpl;
-    Vloc2(it) = 2*v(OUTiglobLoc2) + Vpl;
-    Vloc3(it) = 2*v(OUTiglobLoc3) + Vpl;
-    Vloc4(it) = 2*v(OUTiglobLoc4) + Vpl;
-    VmaxSave(it) = Vfmax;
-    Dloc1(it) = 2*d(OUTiglobLoc1) + Vpl * t;
-    Dloc2(it) = 2*d(OUTiglobLoc2) + Vpl * t;
-    Dloc3(it) = 2*d(OUTiglobLoc3) + Vpl * t;
-    Dloc4(it) = 2*d(OUTiglobLoc4) + Vpl * t;
-    Tauloc1(it) = (tau(FaultLoc1)+tauo(FaultLoc1))/10^6;
-    Tauloc2(it) = (tau(FaultLoc2)+tauo(FaultLoc2))/10^6;
-    Tauloc3(it) = (tau(FaultLoc3)+tauo(FaultLoc3))/10^6;
-    Tauloc4(it) = (tau(FaultLoc4)+tauo(FaultLoc4))/10^6;
-    dtSave(it) = dt;
-    if (isolver == 1); NumIteSave(it) = n1(1)+n1(2); end;
-    d5(it) = d(OUTiglobLoc5);
-    v5(it) = v(OUTiglobLoc5);
-    a5(it) = a(OUTiglobLoc5);
+     Vfmax=2*max(v(FaultIglob,1))+Vpl;  % compute Vfmax used a lot in OUTPUT
+%         
+%     % Output variables at 0km, 3km, 6km and 9km for every time step
+%     Vloc1(it) = 2*v(OUTiglobLoc1) + Vpl;
+%     Vloc2(it) = 2*v(OUTiglobLoc2) + Vpl;
+%     Vloc3(it) = 2*v(OUTiglobLoc3) + Vpl;
+%     Vloc4(it) = 2*v(OUTiglobLoc4) + Vpl;
+%     VmaxSave(it) = Vfmax;
+%     Dloc1(it) = 2*d(OUTiglobLoc1) + Vpl * t;
+%     Dloc2(it) = 2*d(OUTiglobLoc2) + Vpl * t;
+%     Dloc3(it) = 2*d(OUTiglobLoc3) + Vpl * t;
+%     Dloc4(it) = 2*d(OUTiglobLoc4) + Vpl * t;
+%     Tauloc1(it) = (tau(FaultLoc1)+tauo(FaultLoc1))/10^6;
+%     Tauloc2(it) = (tau(FaultLoc2)+tauo(FaultLoc2))/10^6;
+%     Tauloc3(it) = (tau(FaultLoc3)+tauo(FaultLoc3))/10^6;
+%     Tauloc4(it) = (tau(FaultLoc4)+tauo(FaultLoc4))/10^6;
+%     dtSave(it) = dt;
+%     if (isolver == 1); NumIteSave(it) = n1(1)+n1(2); end;
+%     d5(it) = d(OUTiglobLoc5);
+%     v5(it) = v(OUTiglobLoc5);
+%     a5(it) = a(OUTiglobLoc5);
     
 %     if (mod(it,10) == 0 && isolver == 1)
 %        figure(10);
@@ -1183,33 +1185,33 @@ while t < tmax,
 %     end  
     
     %OUTPUT stress, slip, and slip velocity on fault every certain interval
-    if (t>tvsx)        % "delvsx"
-        ntvsx=ntvsx+1;
-        delf5yr(:,ntvsx) = 2*d(FaultIglob)+Vpl*t;
-        Vf5yr(:,ntvsx) = 2*v(FaultIglob)+Vpl;
-        Tau5yr(:,ntvsx) = (tau + tauo)/10^6;
-        tvsx = tvsx + tvsxinc;
-    end
-    if (Vfmax>Vevne && false)    %"delevne"
-         if (idelevne==0)
-            nevne=nevne+1;
-            idelevne = 1;
-            tevneb = t;
-            tevne = tevneinc;
-            delfsec(:,nevne)=2*d(FaultIglob)+Vpl*t;
-            Vfsec(:,nevne) = 2*v(FaultIglob)+Vpl;
-            Tausec(:,nevne) = (tau + tauo)/10^6;
-         end
-         if (idelevne==1 && (t-tevneb)>tevne) 
-            nevne=nevne+1;
-            delfsec(:,nevne)=2*d(FaultIglob)+Vpl*t;
-            Vfsec(:,nevne) = 2*v(FaultIglob)+Vpl;
-            Tausec(:,nevne) = (tau + tauo)/10^6;
-            tevne = tevne + tevneinc;
-         end
-    else
-        idelevne = 0;
-    end
+%     if (t>tvsx)        % "delvsx"
+%         ntvsx=ntvsx+1;
+%         delf5yr(:,ntvsx) = 2*d(FaultIglob)+Vpl*t;
+%         Vf5yr(:,ntvsx) = 2*v(FaultIglob)+Vpl;
+%         Tau5yr(:,ntvsx) = (tau + tauo)/10^6;
+%         tvsx = tvsx + tvsxinc;
+%     end
+%     if (Vfmax>Vevne && false)    %"delevne"
+%          if (idelevne==0)
+%             nevne=nevne+1;
+%             idelevne = 1;
+%             tevneb = t;
+%             tevne = tevneinc;
+%             delfsec(:,nevne)=2*d(FaultIglob)+Vpl*t;
+%             Vfsec(:,nevne) = 2*v(FaultIglob)+Vpl;
+%             Tausec(:,nevne) = (tau + tauo)/10^6;
+%          end
+%          if (idelevne==1 && (t-tevneb)>tevne) 
+%             nevne=nevne+1;
+%             delfsec(:,nevne)=2*d(FaultIglob)+Vpl*t;
+%             Vfsec(:,nevne) = 2*v(FaultIglob)+Vpl;
+%             Tausec(:,nevne) = (tau + tauo)/10^6;
+%             tevne = tevne + tevneinc;
+%          end
+%     else
+%         idelevne = 0;
+%     end
       
     %OUTPUT stress and slip before and after events
 %     if (Vfmax > 1.01*Vthres && slipstart == 0) 
@@ -1232,7 +1234,7 @@ while t < tmax,
         fprintf('it = %5d \n',it); 
         fprintf('dt (s) = %1.4g \n',dt);
         fprintf('t (yr) = %1.5g \n',t/yr2sec);
-        fprintf('Vmax (m/s) = %1.4g \n',Vfmax);
+ %       fprintf('Vmax (m/s) = %1.4g \n',Vfmax);
         fprintf('vmax (m/s) = %1.4g \n',max(v));
         %fprintf('Ma/min(Kd,Btau) = %1.4g \n',P_Ma(it));
         %if isolver == 1
