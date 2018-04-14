@@ -21,7 +21,7 @@ IDintitCond = 2;
 % If IDstate = 1, compute psi(t+dt) = psi(t) + dt * dpsi(t)/dt
 % If IDstate = 2, compute psi(t+dt) by integration with constant V
 % If IDstate = 3, compute psi(t+dt) of slip law by integration with constant V
-IDstate = 1;
+IDstate = 2;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

@@ -48,10 +48,12 @@ end
 %st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
-st_node_space = '3_4';  NELX = 9; NELY = 6; P = 4; 
+st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
 
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
+NELY_left = NELY/2;
+NELY_right = NELY - NELY_left;
 
 dxe = LX/NELX;
 dye = LY/NELY;
@@ -65,6 +67,9 @@ periodical = false;
 
 iglob = zeros(NGLL,NGLL,NELX*NELY);	% local to global index mapping
 nglob = (NELX*(NGLL-1)+(~periodical)*1)*(NELY*(NGLL-1)+1);	% number of global nodes
+nglob_left = (NELX*(NGLL-1)+(~periodical)*1)*(NELY_left*(NGLL-1)+1);
+nglob_right= (NELX*(NGLL-1)+(~periodical)*1)*(NELY_right*(NGLL-1)+1);
+
 % if periodical
 %     nglob = (NELX * (NGLL-1))*(NELY*(NGLL-1)+1);
 % end
@@ -74,14 +79,12 @@ y     = zeros(nglob,1);
 
 e=0;
 last_iglob = 0;
-igL = reshape([1:NGLL*(NGLL-1)],NGLL-1,NGLL);
-igB = reshape([1:NGLL*(NGLL-1)],NGLL,NGLL-1);
-igLB = reshape([1:(NGLL-1)*(NGLL-1)],NGLL-1,NGLL-1);
+
 xgll = repmat( 0.5*(1+XGLL) , 1,NGLL);
 ygll = dye*xgll';
 xgll = dxe*xgll;
 
-for ey=1:NELY, 
+for ey=1:NELY_left, 
 for ex=1:NELX, 
 
   e = e+1;
@@ -104,8 +107,62 @@ for ex=1:NELX,
 end
 end
 
+for ey=NELY_left+1:NELY, 
+for ex=1:NELX, 
+
+  e = e+1;
+  %easier indexing
+  for i = 1:1:NGLL
+      for j = 1:1:NGLL
+          
+          iglob(i,j,e) = ((ey-1) * (NGLL-1) + j) * (NELX * (NGLL-1)+ (~periodical)*1);
+          if(~periodical)
+              xpos = ((ex-1)*(NGLL-1) + i-1)+ 1 ; 
+          else
+              xpos = mod(((ex-1)*(NGLL-1) + i-1),NELX*(NGLL-1))+1;
+          end
+          iglob(i,j,e) = iglob(i,j,e) + xpos;
+                
+            x(iglob(i,j,e)) = dxe*(ex-1)+xgll(i,1);
+            y(iglob(i,j,e)) = dye*(ey-1)+ygll(1,j);
+      end
+  end  
+end
+end
+% for ey=1:NELY, 
+% for ex=1:NELX, 
+% 
+%   e = e+1;
+% 
+%  % Take care of redundant nodes at element edges :
+%   if e==1  % first element: bottom-left
+%     ig = reshape([1:NGLL*NGLL],NGLL,NGLL);    
+%   else
+%     if ey==1 	%  elements on first (bottom) row
+%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
+%       ig(2:NGLL,:) = last_iglob + igL; 		% the rest
+%     elseif ex==1 % elements on first (left) column
+%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
+%       ig(:,2:NGLL) = last_iglob + igB; 		% the rest
+%     else 	% other elements
+%       ig(1,:) = iglob(NGLL,:,e-1); 		% left edge
+%       ig(:,1) = iglob(:,NGLL,e-NELX); 		% bottom edge
+%       ig(2:NGLL,2:NGLL) = last_iglob + igLB;
+%     end
+%   end
+%   iglob(:,:,e) = ig;
+%   last_iglob = ig(NGLL,NGLL);
+% 
+%  % Global coordinates of the computational (GLL) nodes
+%   x(ig) = dxe*(ex-1)+xgll;
+%   y(ig) = dye*(ey-1)+ygll;
+% 
+%    
+% end
+% end    
 
 x = x-LX/2;
+y = y-LY/2;
 nglob = length(x);
 
 RHO = 2670;
@@ -154,7 +211,7 @@ for ey=1:NELY,
         ig = iglob(:,:,e);
         
         %**** Set here the physical properties of the heterogeneous medium : ****
-        if (ey*dye <= -10*THICK)  % modified for layer case
+        if (ey <= NELY_left)  % modified for layer case
         rho(:,:) = RHO;
         mu(:,:)  = RHO* VS1^2;
         ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
@@ -194,7 +251,7 @@ dt = CFL*dt;
 dtmin = dt;
 
 tmax = Total_time;
-dtmax = 5000000000*24*60*60/distN*100; % 5 days
+dtmax = 50*24*60*60/distN*100; % 5 days
 
 if ETA, dt=dt/sqrt(1+2*ETA); end  % dt modified slightly for damping
 NT = ceil(Total_time/dtmin)       % estimate the max possible time step
@@ -204,7 +261,10 @@ half_dt_sq = 0.5*dtmin^2;
 %-- Initialize kinematic fields, stored in global arrays
 d = zeros(nglob,2);  %xy plane d(:,1) = ux, d(:,2) = uy;
 v = zeros(nglob,2);
-v(:,1) = 1/2*10^-3;
+LEFT = [1:1:nglob/2]; % left plate
+RIGHT = [nglob/2+1:1:nglob]; % right plate
+v(LEFT,1) = 1/2*10^-3;
+v(RIGHT,1) = -1/2*10^-3;
 vPre = zeros(nglob,2);
 a = zeros(nglob,2);
 
@@ -242,24 +302,41 @@ for ey=1:NELY,
     BcRightC(ip) = BcRightC(ip) + dy_deta*wgll*impedance ;
 end
 % Top
-ng = NELX*(NGLL-1)+(~periodical)*1;
+ng = NELX*(NGLL-1)+(~periodical);
 BcTopIglob = zeros(ng,1);
 BcTopCx = zeros(ng,1);
 BcTopCz = zeros(ng,1);
 for ex=1:NELX,
-    ip = (NGLL-1)*(ex-1)+[1:NGLL-periodical*1] ;
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-1+(~periodical)] ;
     e = (NELY-1)*NELX+ex;
-    BcTopIglob(ip) = iglob(1:NGLL-periodical*1,NGLL,e);
+    BcTopIglob(ip) = iglob(1:NGLL-1+(~periodical),NGLL,e);
 %    if (ex < NELX/2)          % modified for layer case   
 %    impedance = RHO*VS1;
 %    else
     impedance = RHO*VS2;
     impedance2 = RHO*VP2;
 %    end
-    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-periodical)*impedance ;
-    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-periodical)*impedance2;
+%    BcTopCx(ip) = BcTopCx(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance ;
+%    BcTopCz(ip) = BcTopCz(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance2;
 end
 
+ng = NELX*(NGLL-1);
+BcBotIglob = zeros(ng,1);
+BcBotCx = zeros(ng,1);
+BcBotCz = zeros(ng,1);
+for ex=1:NELX,
+    ip = (NGLL-1)*(ex-1)+[1:NGLL-1+(~periodical)] ;
+    e = ex;
+    BcBotIglob(ip) = iglob(1:NGLL-1+(~periodical),1,e);
+%    if (ex < NELX/2)          % modified for layer case   
+%    impedance = RHO*VS1;
+%    else
+    impedance = RHO*VS2;
+    impedance2 = RHO*VP2;
+%    end
+%    BcBotCx(ip) = BcBotCx(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance ;
+%    BcBotCz(ip) = BcBotCz(ip) + dx_dxi*wgll(1:end-periodical*1)'*impedance2;
+end
 Mq = M;
 % % The mass matrix needs to be modified at the boundary
 % % for the IMPLICIT treatment of the term C*v.
@@ -273,23 +350,32 @@ Mz(BcTopIglob) = Mz(BcTopIglob) + half_dt*BcTopCz;
 
 %-- DYNAMIC FAULT at bottom boundary
 FaultNglob = NELX*(NGLL-1)+1;
-FaultIglob = zeros(FaultNglob,1);
+FaultIglob = zeros(FaultNglob,2);
+FaultIglob1 = zeros(FaultNglob,1);
+FaultIglob2 = zeros(FaultNglob,1);
+
 FaultB = zeros(FaultNglob,1);
 for ex = 1:NELX,
     ip = (NGLL-1)*(ex-1)+[1:NGLL];
-    e = ex;
-    FaultIglob(ip) = iglob(1:NGLL,1,e);
+    e1 = ex + (NELY_left -1)* NELX;
+    e2 = ex + (NELY_left)*NELX;
+    FaultIglob1(ip) = iglob(1:NGLL,NGLL,e1);
+    FaultIglob2(ip) = iglob(1:NGLL,1,e2);
     FaultB(ip) = FaultB(ip) + dx_dxi*wgll;    
 end
+FaultIglob(:,1) = FaultIglob1;
+FaultIglob(:,2) = FaultIglob2;
 %FaultZ = M(FaultIglob)./FaultB /half_dt;
 if(periodical)  %periodical boundary condition
     FaultB(1) = FaultB(1) + FaultB(end);
     FaultB = FaultB(1:end-1);
-    FaultIglob = FaultIglob(1:end-1);
+    FaultIglob = FaultIglob(1:end-1,:);
     FaultNglob = FaultNglob-1;
 end
-FaultZ = M(FaultIglob)./FaultB /half_dt * 0.5;  % times 0.5 due to the symmetry
-FaultX = x(FaultIglob);
+
+
+FaultZ = M(FaultIglob(:,1))./FaultB /half_dt * 0.5;  % times 0.5 due to the symmetry
+FaultX = x(FaultIglob(:,1));
 
 Seff = repmat(120*10^6,FaultNglob,1);  % effective normal stress
 fo = repmat(0.6,FaultNglob,1);         % reference friction
@@ -337,7 +423,7 @@ elseif IDintitCond == 2
     isel4 = find(xcoord<=-8e3/distN&xcoord>=-(8e3/distN+width/2));
     ccb(isel4)=Amplitude2 + Amplitude3*cos(2*pi*(xcoord(isel4)+8e3)/width);
     tau = repmat(0,FaultNglob,1);
-    psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(2*v(FaultIglob)./Vo);
+    psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(abs(v(FaultIglob(:,2))-v(FaultIglob(:,1)))./Vo);
     psi0 = psi;
 
 end
@@ -375,7 +461,7 @@ OUTindx = Init2dSnapshot(iglob);
 % time is a array stored time at each time step
 t = 0;
 it = 0;
-dtincf = 2.0;
+dtincf = 1.2;
 dtpre = dt;
 gamma = pi/4;
 % average node spacing
@@ -450,11 +536,17 @@ pp = 1;
 
 jj = 1;
 jjj = 1;
+iside = 1;
 for ii = 1:nglob
-    if ii == FaultIglob(jj)
+    if ii == FaultIglob(jj,iside)
         jj = jj + 1; 
         if jj > length(FaultIglob)
-            jj = length(FaultIglob);
+            if(iside == 1)
+                jj = 1;
+                iside = 2;
+            else
+                jj = length(FaultIglob);
+            end
         end
     else
        FaultNIglob(jjj,1) = ii;  % find nodes that do not belong to fault
@@ -513,28 +605,46 @@ for e=1:NEL, % FOR EACH ELEMENT ...
     Kdiagx(ig) = Kdiagx(ig) + Klocdiagx(:,:);
     Kdiagz(ig) = Kdiagz(ig) + Klocdiagz(:,:);
 end
-
+Kdiagz(FaultIglob(:,2)) = Kdiagz(FaultIglob(:,1))+Kdiagz(FaultIglob(:,2));% assemble normal direction 
+Kdiagx(FaultIglob(:,2)) = Kdiagx(FaultIglob(:,1))+Kdiagx(FaultIglob(:,2));
+%since uz(fault+) = uz(fault-)
 Kdiag(:,1) = Kdiagx;
 Kdiag(:,2) = Kdiagz;
-diagKnew = Kdiag(FaultNIglob,:);
+diagKnew(FaultNIglob,:) = Kdiag(FaultNIglob,:);
 
-v(:,1) = v(:,1) - 0.5*Vpl;
-Vf = 2*v(FaultIglob,:);
+v(LEFT,1) = v(LEFT,1) + 0.5*Vpl;
+v(RIGHT,1) = v(RIGHT,1) - 0.5*Vpl;
+Vf = v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1);
+%slip velocity 
 iFBC = find(abs(FaultX)>=bound*10^3/distN);
 NFBC = length(iFBC);
 Vf(iFBC,:) = 0;
 
+FaultIglobBC = zeros(NFBC,2);
 jj = 1;
-FaultIglobBC = zeros(NFBC,1);
-for ex = 1:NELX
+for ex = 1:NELX 
     for k = 1:NGLL
-       if abs(x(iglob(k,1,ex))) >= bound*10^3/distN 
-          FaultIglobBC(jj) = iglob(k,1,ex);
+        ex1 = ex + NELX * (NELY_left-1);
+       if abs(x(iglob(k,NGLL,ex1))) >= bound*10^3/distN 
+          FaultIglobBC(jj,1) = iglob(k,NGLL,ex1);
           jj = jj + 1;
        end
     end        
 end
-v(FaultIglobBC,:) = 0;
+jj = 1;
+for ex = 1:NELX 
+    for k = 1:NGLL
+        ex1 = ex + NELX * (NELY_left);
+       if abs(x(iglob(k,1,ex1))) >= bound*10^3/distN 
+          FaultIglobBC(jj,2) = iglob(k,1,ex1);
+          jj = jj + 1;
+       end
+    end        
+end
+%FaultIglobBC = FaultIglobBC(1:NFBC,:);
+v(FaultIglobBC(:,1),:) = 0;
+v(FaultIglobBC(:,2),:) = 0;
+FixBoundary = [BcTopIglob',BcBotIglob',FaultIglobBC(:)'];
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% START OF TIME LOOP %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -546,9 +656,9 @@ if restart
     d = d_store;
     a = a_store;
     psi=psi_store;
-    [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
+    [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
 end
-[dt]=dtevol(0.001,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
+[dt]=dtevol(0.00001,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
 
 while t < tmax,
     dt
@@ -561,49 +671,28 @@ while t < tmax,
         a_store = a;
         psi_store=psi;
         dt_store = dt;
-   
+        
+     
     if isolver == 1
-    
+        
+    v_estimate = v; % make an initial guess
     %if true
     display('quasi solver');
     
     vPre = v;
     dPre = d;
     
-    Vf0 = 2*v(FaultIglob,1) + Vpl;
-    Vf = Vf0;
- %   figure(4);
+    
+    
+    
     for p1=1:2
-    
-    % compute the forcing term F
-    F(:,:) = 0;
-    F(FaultIglob,1) = dPre(FaultIglob,1) + v(FaultIglob,1)*dt;
-    
-    % assign previous solution of the disp field as an initial guess
-    dnew(FaultNIglob,:) = d(FaultNIglob,:);
-    dnew(FaultIglob,2) = d(FaultIglob,2);
-    
-
-    [dnew,n1(p1)]=myPCGnew4(coefint1,coefint2,Kdiag,dnew,F,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,BcTopIglob, x,y);
-    
-   
-    % update displacement of medium
-    d(FaultNIglob,:) = dnew(FaultNIglob,:);
-    d(FaultIglob, 2) = dnew(FaultIglob,2);
-    
-    % make d = F on the fault
-    d(FaultIglob,1) = F(FaultIglob,1);
-    
-    % compute on-fault stress  
-    a = computeforce(iglob,W,Wl,H,Ht,d,coefint1, coefint2);
-
-    a(FaultIglobBC,:) = 0;  % enforce K*d for velocity boundary (v = 0) to be zero.
-    tau1 = -a(FaultIglob,1)./(FaultB);   
-    
-    % compute slip rates on fault
-    for jF=1:FaultNglob-NFBC
-        j = jF + NFBC/2 ;
+        
+%        d = dPre + 0.5*dt*(v_estimate + vPre);
+        
+%        Vf = abs(v_estimate(FaultIglob(:,1),1) - v_estimate(FaultIglob(:,2),1))  + Vpl;
+        %first step calculate vslip
+     for jF=1:FaultNglob
+        j = jF ;
         if IDstate == 1
             psi1(j) = psi(j) + dt*((Vo(j)./xLf(j)).*exp(-psi(j)) - abs(Vf(j))./xLf(j));    
         elseif IDstate == 2
@@ -629,12 +718,27 @@ while t < tmax,
         help1 = exp(help+fa);
         help2 = exp(help-fa);
         Vf1(j) = Vo(j)*(help1 - help2);     
+        %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
+        % compute shear stress
+        %tau1(j) =tauAB(j) -  tauo(j);   
     end
-    Vf1(iFBC) = Vpl;
-    Vf = (Vf0+Vf1)/2;
-    v(FaultIglob,1) = 0.5*Vf-0.5*Vpl;
-%    plot(x(FaultIglob), log10(v(FaultIglob,1)));
-%    hold on
+    % compute the forcing term F
+    %F(FaultIglob(:,1),1) = -tau1.*FaultB;
+    %F(FaultIglob(:,2),1) = tau1.*FaultB;
+    %F(FaultIglob(:,2),2) = 0;
+    % assign previous solution of the disp field as an initial guess
+    %dnew = d;
+    
+
+    [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y);
+    
+    
+    % update displacement of medium
+    d = dnew;
+ %   d(FaultIglob(:,1),2) = dnew(FaultIglob(:,1),2);
+    
+    v_estimate = 2*(d - dPre)/dt - vPre;
     end
     %[n1(1) n1(2)]
     psi = psi1;
@@ -643,14 +747,8 @@ while t < tmax,
     Vf1(iFBC) = Vpl;
     
     v(FaultIglob,1) = 0.5*Vf1-0.5*Vpl;
-    v(FaultNIglob,:) = (d(FaultNIglob,:)-dPre(FaultNIglob,:))/dt;
-    v(FaultNIglob,:) = 2*v(FaultNIglob,:) -  vPre(FaultNglob,:);
+    v(FaultNIglob,1) = (d(FaultNIglob,1)-dPre(FaultNIglob,1))/dt;
     
-%    plot(x(FaultIglob), log10(v(FaultIglob,1)));
-%    hold off
-    figure(5)
-    plot(x(FaultIglob), tauAB(FaultIglob)./Seff);
-    hold on
     RHS = a;
     RHS(FaultIglob,:) = RHS(FaultIglob,:) - FaultB.*tau;    
     RMS = sqrt(sum((RHS(:)).^2)/length(RHS(:)))./max(abs(RHS(:)));
@@ -839,18 +937,19 @@ while t < tmax,
         figure(1);
 
         subplot(2,1,1);
-        scatter(x,y,10,d(:,1),'fill');
+        scatter(x,y,10,v(:,1),'fill');
         colormap('jet');
         subplot(2,1,2);
-        scatter(x,y,10,d(:,2),'fill');
+        scatter(x,y,10,v(:,2),'fill');
         colormap('jet');
         getframe;
         figure(2);
-        plot(x(FaultIglob),log10(Vf),c);
+        A = [2:length(FaultIglob),1];
+        plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
         getframe;
         hold on
         figure(3);
-        plot(x(FaultIglob),(psi),c);
+        plot(x(FaultIglob(A)),(psi(A)),c);
         getframe;
         hold on
     end
