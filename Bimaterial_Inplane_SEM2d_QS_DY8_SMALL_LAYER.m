@@ -462,7 +462,7 @@ OUTindx = Init2dSnapshot(iglob);
 % time is a array stored time at each time step
 t = 0;
 it = 0;
-dtincf = 1.2;
+dtincf = 2;
 dtpre = dt;
 gamma = pi/4;
 % average node spacing
@@ -806,8 +806,8 @@ while t < tmax,
             local_x = dx(ig) +eta.*vx(ig); % Kelvin-Voigt viscosity
             local_z = dz(ig) +eta.*vz(ig);
         else
-            local_x = dx(ig) ; % Kelvin-Voigt viscosity
-            local_z = dz(ig) ;
+            local_x = dx(ig) +0.1 * dt *vx(ig); % Kelvin-Voigt viscosity
+            local_z = dz(ig) +0.1 * dt *vz(ig);
         end
         %gradients wrt local variables (xi,eta)
     %    d_xi  = Ht*local;
@@ -963,6 +963,9 @@ while t < tmax,
         figure(3);
         plot(x(FaultIglob(A)),(psi(A)),c);
         getframe;
+        hold on
+        figure(4);
+        plot(x(FaultIglob(A,1)),tau(A),c);
         hold on
     end
     
