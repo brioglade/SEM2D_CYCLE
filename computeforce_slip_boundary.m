@@ -2,17 +2,21 @@ function [a] = computeforce_slip_boundary(iglob,W,Wl,H,Ht,d,slip,Iglob,coefint1,
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
     NGLOB = length(d);
+    NGLL=5;
     [~,~,NEL] =size(iglob);
     a=zeros(NGLOB,2);
     ax = zeros(NGLOB,1);
     az = zeros(NGLOB,1);
     d(Iglob(:,1),2) = d(Iglob(:,2),2); % make a copy of displacement field.
     d(Iglob(:,1),1) = d(Iglob(:,2),1) + slip;
-    for e=1:NEL              
+    local_fx =  zeros(NGLL,NGLL);
+    local_fz =  zeros(NGLL,NGLL);
+     dx = d(:,1);
+     dz = d(:,2);
+   for e=1:NEL              
         %switch to local (element) representation
         ig = iglob(:,:,e);
-        dx = d(:,1);
-        dz = d(:,2);
+
         local_x = dx(ig);
         local_z = dz(ig);
         %gradients wrt local variables (xi,eta)
@@ -34,12 +38,12 @@ function [a] = computeforce_slip_boundary(iglob,W,Wl,H,Ht,d,slip,Iglob,coefint1,
         dzxzx = H * (wloc .* (Ht*local_z)) * coefint1;
         
         
-        local_x = dxxxx + dxxzz + dxzxz + dxzzx;
-        local_z = dzzzz + dzzxx + dzxzx + dzxxz;
-        
+        local_fx(:,:) = dxxxx + dxxzz + dxzxz + dxzzx;
+        local_fz(:,:) = dzzzz + dzzxx + dzxzx + dzxxz;
+   
         %assemble into global vector
-        ax(ig) = ax(ig) + local_x;
-        az(ig) = az(ig) + local_z;
+        ax(ig) = ax(ig) + local_fx(:,:);
+        az(ig) = az(ig) + local_fz(:,:);
     end
     a(:,1) = ax;
     a(:,2) = az;

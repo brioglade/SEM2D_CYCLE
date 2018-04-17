@@ -22,7 +22,7 @@ IDintitCond = 2;
 % If IDstate = 2, compute psi(t+dt) by integration with constant V
 % If IDstate = 3, compute psi(t+dt) of slip law by integration with constant V
 IDstate = 2;
-
+%parpool('local',10);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % STEP 1: SPECTRAL ELEMENT MESH GENERATION
@@ -663,10 +663,10 @@ if restart
     d = d_store;
     a = a_store;
     psi=psi_store;
-    [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
-end
+    [dt]=dtevol(Inf,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
+else
 [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,abs(v(FaultIglob(:,1),1) -v(FaultIglob(:,2),1))+Vpl,isolver);
-
+end
 while t < tmax,
     dt
     it = it + 1;
@@ -715,16 +715,25 @@ while t < tmax,
                 return
             end
         end
-        tauAB(j) = tau1(j) + tauo(j);
-        fa = tauAB(j)/((Seff(j)+sigma1(j))*cca(j));
-        help = -(fo(j)+ccb(j)*psi1(j))/cca(j);
+     end
+     for is = 1:1:1
+        psi1 = psi1 - 0.01*dudx2(psi1,H,Ht,wgll);
+     end
+     for is = 1:1:1
+            tau1 = tau1 - 0.01*dudx2(tau1,H,Ht,wgll);
+            sigma1 = sigma1 - 0.01*dudx2(sigma1,H,Ht,wgll);
+     end
+     tauAB = tauo + tau1;
+        fa = tauAB./((Seff+sigma1).*cca);
+        help = -(fo+ccb.*psi1)./cca;
         help1 = exp(help+fa);
         help2 = exp(help-fa);
-        Vf1(j) = Vo(j)*(help1 - help2);     
+        Vf1 = Vo.*(help1 - help2);   
+        
+        
         %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
         % compute shear stress
         %tau1(j) =tauAB(j) -  tauo(j);   
-    end
     % compute the forcing term F
     %F(FaultIglob(:,1),1) = -tau1.*FaultB;
     %F(FaultIglob(:,2),1) = tau1.*FaultB;
@@ -743,9 +752,9 @@ while t < tmax,
     % to ensure second order accuracy;
     d = dPre + 0.5*dt*(vnew + vPre); 
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);
-    tau1 = -a(FaultIglob(:,1),1)./FaultB;
+    tau1 =0.5 * ( -a(FaultIglob(:,1),1) + a(FaultIglob(:,2),1))./FaultB;
     %generate new prediction for tau and sigma;
-    sigma1 = a(FaultIglob(:,1),2)./FaultB;
+    sigma1 = 0.5 * ( a(FaultIglob(:,1),2) - a(FaultIglob(:,2),2))./FaultB;
  %   d(FaultIglob(:,1),2) = dnew(FaultIglob(:,1),2);
     Vf = (Vf + Vf1)/2;
     v = vnew;
@@ -772,9 +781,7 @@ while t < tmax,
     
 %   d(FaultIglobBC,:) = 0;
 %    v(FaultIglobBC,:) = 0;
-    if(it == 759)
-        stop;
-    end
+   
     %hold on
     else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
     display('Dynamic solver');
@@ -935,40 +942,46 @@ while t < tmax,
     end
     
     if(isolver==1)
-        everyN = 1;
+        everyN = 10;
     else
         everyN = 100;
     end
     
-    if(mod(it,everyN) == 0)
-        if(isolver==1)
-            c = 'b';
-        else
-            c = 'r';
-        end
-        figure(1);
+   if(mod(it,everyN) == 0)
+       if(isolver==1)
+           c = 'b';
+       else
+           c = 'r';
+       end
+       figure(1);
 
-        subplot(2,1,1);
-        scatter(x,y,10,v(:,1),'fill');
-        colormap('jet');
-        subplot(2,1,2);
-        scatter(x,y,10,v(:,2),'fill');
-        colormap('jet');
-        getframe;
-        figure(2);
-        A = [2:length(FaultIglob),1];
-        plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
-        getframe;
-        hold on
-        figure(3);
-        plot(x(FaultIglob(A)),(psi(A)),c);
-        getframe;
-        hold on
-        figure(4);
-        plot(x(FaultIglob(A,1)),tau(A),c);
-        hold on
+       subplot(2,1,1);
+       scatter(x,y,10,v(:,1),'fill');
+       colormap('jet');
+       colorbar;
+       subplot(2,1,2);
+       scatter(x,y,10,v(:,2),'fill');
+       colormap('jet');
+       colorbar;
+       getframe;
+       figure(2);
+       A = [2:length(FaultIglob),1];
+       plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
+       getframe;
+       hold on
+       figure(3);
+       plot(x(FaultIglob(A)),(psi(A)),c);
+       getframe;
+       hold on
+       figure(4);
+       plot(x(FaultIglob(A,1)),tau(A),c);
+       hold on
+   end
+    if mod(it,10) == 0
+        cmd =sprintf('save snapshot%d.mat',it);
+        eval(cmd);
     end
-    
+   
      Vfmax=2*max(v(FaultIglob,1))+Vpl;  % compute Vfmax used a lot in OUTPUT
 %         
 %     % Output variables at 0km, 3km, 6km and 9km for every time step
