@@ -861,7 +861,7 @@ while t < tmax,
     % compute state variable using Vf from the previous time step
     sigma1 = (a(FaultIglob(:,1),2)./M(FaultIglob(:,1)) - a(FaultIglob(:,2),2)./M(FaultIglob(:,2))).*FaultZ*half_dt;
     
-    Vf = (vPre(FaultIglob(:,2),1) - vPre(FaultIglob(:,1),1))  + Vpl;
+    Vf = (vPre(FaultIglob(:,1),1) - vPre(FaultIglob(:,2),1))  + Vpl;
 
     for jF=1:FaultNglob-NFBC
         j = jF + NFBC/2;
