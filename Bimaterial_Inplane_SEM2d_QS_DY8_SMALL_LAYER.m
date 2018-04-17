@@ -217,8 +217,8 @@ for ey=1:NELY,
         ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS1^2;   
-        ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS2^2;   
+        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
         end
         if muMax < max(max(mu)); muMax = max(max(mu)); end;
         
@@ -374,7 +374,8 @@ if(periodical)  %periodical boundary condition
 end
 
 
-FaultZ = M(FaultIglob(:,1))./FaultB /half_dt * 0.5;  % times 0.5 due to the symmetry
+%FaultZ = M(FaultIglob(:,1))./FaultB /half_dt * 0.5;  % times 0.5 due to the symmetry
+FaultZ = 1./(FaultB./M(FaultIglob(:,1))+FaultB./M(FaultIglob(:,2)))/half_dt;
 FaultX = x(FaultIglob(:,1));
 
 Seff = repmat(120*10^6,FaultNglob,1);  % effective normal stress
@@ -858,7 +859,9 @@ while t < tmax,
     FaultVFree = -( v(FaultIglob(:,2),:) + half_dt*a(FaultIglob(:,2),:)./M(FaultIglob(:,2)) -...   %
                       v(FaultIglob(:,1),:) - half_dt*a(FaultIglob(:,1),:)./M(FaultIglob(:,1)) );
     % compute state variable using Vf from the previous time step
-    Vf = abs(vPre(FaultIglob(:,2),1) - vPre(FaultIglob(:,1),1))  + Vpl;
+    sigma1 = (a(FaultIglob(:,1),2)./M(FaultIglob(:,1)) - a(FaultIglob(:,2),2)./M(FaultIglob(:,2))).*FaultZ*half_dt;
+    
+    Vf = (vPre(FaultIglob(:,2),1) - vPre(FaultIglob(:,1),1))  + Vpl;
 
     for jF=1:FaultNglob-NFBC
         j = jF + NFBC/2;
@@ -884,7 +887,7 @@ while t < tmax,
      
         % N-R search
         tauNR(j) = tau(j) + tauo(j);
-        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j),...
+        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+sigma1(j),...
             tauNR(j),tauo(j),psi1(j),FaultZ(j),FaultVFree(j,1));
         if Vf(j) > 10^10 || isnan(Vf(j)) == 1 || isnan(tau1(j)) == 1 
             'NR search failed!'
@@ -907,7 +910,7 @@ while t < tmax,
                 exp(-0.5*abs(Vf1(j)+Vf(j)).*dt./xLf(j)).*psi(j) + log(Vo(j)./(0.5*abs(Vf1(j)+Vf(j))));
         end
         % N-R search (2nd loop)
-        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j),...
+        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+sigma1(j),...
             tau1(j),tauo(j),psi2(j),FaultZ(j),FaultVFree(j));
 
     end
@@ -918,6 +921,8 @@ while t < tmax,
     KD = a;
     a(FaultIglob(:,2),1) = a(FaultIglob(:,2),1) + FaultB .*tau;
     a(FaultIglob(:,1),1) = a(FaultIglob(:,1),1) - FaultB .*tau;
+    a(FaultIglob(:,2),2) = a(FaultIglob(:,2),2) + FaultB .*sigma1;
+    a(FaultIglob(:,1),2) = a(FaultIglob(:,1),2) - FaultB .*sigma1;
 
     
     %%%%%%%%%%%%%%%%%% the end of fault boundary condition %%%%%%%%%%%%%%%%
@@ -942,9 +947,9 @@ while t < tmax,
     end
     
     if(isolver==1)
-        everyN = 10;
+        everyN = 1e10;
     else
-        everyN = 100;
+        everyN = 1e10;
     end
     
    if(mod(it,everyN) == 0)
