@@ -671,7 +671,7 @@ end
 while t < tmax,
     dt
     it = it + 1;
-    t = t + dt;
+  %  t = t + dt;
     time(it) = t;
     
         v_store = v;
@@ -725,13 +725,13 @@ while t < tmax,
             sigma1 = sigma1 - 0.01*dudx2(sigma1,H,Ht,wgll);
      end
      tauAB = tauo + tau1;
-        fa = tauAB./((Seff+sigma1).*cca);
-        help = -(fo+ccb.*psi1)./cca;
-        help1 = exp(help+fa);
-        help2 = exp(help-fa);
-        Vf1 = Vo.*(help1 - help2);   
-        
-        
+     fa = tauAB./((Seff+0*sigma1).*cca);
+     help = -(fo+ccb.*psi1)./cca;
+     help1 = exp(help+fa);
+     help2 = exp(help-fa);
+     Vf1 = Vo.*(help1 - help2);   
+     dt1 = dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,Vf1,isolver);  
+     display(['dt correction:',num2str(dt1)]);   
         %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
         % compute shear stress
         %tau1(j) =tauAB(j) -  tauo(j);   
@@ -744,14 +744,14 @@ while t < tmax,
     
 
     [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt);
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt1);
     
     %vnew(FaultIglob(:,1),1) = vnew(FaultIglob(:,2),1) + Vpl; % this is enforced 
     %in the previous PCG solver;
     
     % update displacement of medium
     % to ensure second order accuracy;
-    d = dPre + 0.5*dt*(vnew + vPre); 
+    d = dPre + 0.5*dt1*(vnew + vPre); 
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);
     tau1 =0.5 * ( -a(FaultIglob(:,1),1) + a(FaultIglob(:,2),1))./FaultB;
     %generate new prediction for tau and sigma;
@@ -762,6 +762,8 @@ while t < tmax,
 %    Vf = abs(v(FaultIglob1(:,1),1) - v(FaultIglob1(:,2),1)) + Vpl;
     end
     %[n1(1) n1(2)]
+    dt = dt1;
+    t = t+dt;
     psi = psi1;
     tau = tau1;
    
@@ -887,7 +889,7 @@ while t < tmax,
      
         % N-R search
         tauNR(j) = tau(j) + tauo(j);
-        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+sigma1(j),...
+        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+0*sigma1(j),...
             tauNR(j),tauo(j),psi1(j),FaultZ(j),FaultVFree(j,1));
         if Vf(j) > 10^10 || isnan(Vf(j)) == 1 || isnan(tau1(j)) == 1 
             'NR search failed!'
@@ -910,7 +912,7 @@ while t < tmax,
                 exp(-0.5*abs(Vf1(j)+Vf(j)).*dt./xLf(j)).*psi(j) + log(Vo(j)./(0.5*abs(Vf1(j)+Vf(j))));
         end
         % N-R search (2nd loop)
-        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+sigma1(j),...
+        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+0*sigma1(j),...
             tau1(j),tauo(j),psi2(j),FaultZ(j),FaultVFree(j));
 
     end
@@ -947,42 +949,42 @@ while t < tmax,
     end
     
     if(isolver==1)
-        everyN = 1e10;
+        everyN = 10;
     else
-        everyN = 1e10;
+        everyN = 10;
     end
     
-   if(mod(it,everyN) == 0)
-       if(isolver==1)
-           c = 'b';
-       else
-           c = 'r';
-       end
-       figure(1);
-
-       subplot(2,1,1);
-       scatter(x,y,10,v(:,1),'fill');
-       colormap('jet');
-       colorbar;
-       subplot(2,1,2);
-       scatter(x,y,10,v(:,2),'fill');
-       colormap('jet');
-       colorbar;
-       getframe;
-       figure(2);
-       A = [2:length(FaultIglob),1];
-       plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
-       getframe;
-       hold on
-       figure(3);
-       plot(x(FaultIglob(A)),(psi(A)),c);
-       getframe;
-       hold on
-       figure(4);
-       plot(x(FaultIglob(A,1)),tau(A),c);
-       hold on
-   end
-    if mod(it,10) == 0
+%    if(mod(it,everyN) == 0)
+%        if(isolver==1)
+%            c = 'b';
+%        else
+%            c = 'r';
+%        end
+%        figure(1);
+% 
+%        subplot(2,1,1);
+%        scatter(x,y,10,v(:,1),'fill');
+%        colormap('jet');
+%        colorbar;
+%        subplot(2,1,2);
+%        scatter(x,y,10,v(:,2),'fill');
+%        colormap('jet');
+%        colorbar;
+%        getframe;
+%        figure(2);
+%        A = [2:length(FaultIglob),1];
+%        plot([x(FaultIglob(A));x(FaultIglob(A))+90],[log10(v(FaultIglob(A),1));log10(v(FaultIglob(A),1))],c);
+%        getframe;
+%        hold on
+%        figure(3);
+%        plot(x(FaultIglob(A)),(psi(A)),c);
+%        getframe;
+%        hold on
+%        figure(4);
+%        plot(x(FaultIglob(A,1)),tau(A),c);
+%        hold on
+%    end
+    if mod(it,everyN) == 0
         cmd =sprintf('save snapshot%d.mat',it);
         eval(cmd);
     end
