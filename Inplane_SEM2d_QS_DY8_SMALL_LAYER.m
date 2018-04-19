@@ -48,7 +48,7 @@ end
 %st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
-st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
+st_node_space = '3_4';  NELX = 15; NELY = 5; P = 4; 
 
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
@@ -721,8 +721,8 @@ while t < tmax,
             local_x = dx(ig) +eta.*vx(ig); % Kelvin-Voigt viscosity
             local_z = dz(ig) +eta.*vz(ig);
         else
-            local_x = dx(ig);% + 0.1*dt*vx(ig); % Kelvin-Voigt viscosity
-            local_z = dz(ig);% + 0.1*dt*vz(ig);
+            local_x = dx(ig) + 0.1*dt*vx(ig); % Kelvin-Voigt viscosity
+            local_z = dz(ig) + 0.1*dt*vz(ig);
         end
         %gradients wrt local variables (xi,eta)
     %    d_xi  = Ht*local;
