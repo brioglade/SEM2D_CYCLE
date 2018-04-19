@@ -31,7 +31,7 @@ IDstate = 2;
 distN = 1000;
 NSIZE = 2;
 LX = NSIZE*45e3/distN;
-LY = NSIZE*30e3/distN;
+LY = NSIZE*30e3/distN/2;
 
 yr2sec = 365*24*60*60;
 tevent = 197392769.833719193;  % target event time (s)
@@ -48,7 +48,7 @@ end
 %st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
-st_node_space = '3_4';  NELX = 9; NELY = 6; P = 4; 
+st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
 
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
@@ -344,7 +344,7 @@ if IDintitCond == 1
      
       
 elseif IDintitCond == 2
-    xshift = 10;
+    xshift = 0;
     xcoord = FaultX-xshift;
     %-- Initial conditions smooth in time and space
     tauoBack = 70*10^6;
@@ -514,7 +514,7 @@ pnew = zeros(length(FaultNIglob),2);
 % Explicit Newmark scheme with
 % alpha=1, beta=0, gamma=1/2
 %
-isolver = 2;   % initially, 1 for quasistatic, 2 for dynamic
+isolver = 1;   % initially, 1 for quasistatic, 2 for dynamic
 go_snap = 0;
 go_snapDY = 0;
 
@@ -687,9 +687,9 @@ while t < tmax,
     
     d(FaultIglobBC,:) = 0;
     v(FaultIglobBC,:) = 0;
-    if(it == 759)
-        stop;
-    end
+ %   if(it == 759)
+ %       stop;
+ %   end
     %hold on
     else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
     display('Dynamic solver');
@@ -847,9 +847,9 @@ while t < tmax,
     end
     
     if(isolver==1)
-        everyN = 1;
+        everyN = 1e10;
     else
-        everyN = 10;
+        everyN = 1e10;
     end
     
     if(mod(it,everyN) == 0)
@@ -876,6 +876,10 @@ while t < tmax,
         plot(x(FaultIglob(A)),(psi(A)),c);
         getframe;
         hold on
+    end
+    if mod(it,everyN) == 0
+        cmd =sprintf('save snapshot%d.mat',it);
+        eval(cmd);
     end
     
     Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
@@ -1162,7 +1166,7 @@ while t < tmax,
     % Determine quasi-static or dynamic regime based on max slip velocity
     if (isolver == 1 && Vfmax < 5*10^-3) || ...
             (isolver == 2 && Vfmax < 2*10^-3)
-       isolver = 2;
+       isolver = 1;
     else
        isolver = 2;
     end
