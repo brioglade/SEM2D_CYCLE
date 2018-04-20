@@ -825,9 +825,9 @@ while t < tmax,
     end
     
     if(isolver==1)
-        everyN = 1;
+        everyN = 1e10;
     else
-        everyN = 100;
+        everyN = 1e10;
     end
     
     if(mod(it,everyN) == 0)
@@ -853,6 +853,10 @@ while t < tmax,
         plot(x(FaultIglob),(psi),c);
         getframe;
         hold on
+    end
+    if(mod(it,10)==0)
+        cmd =sprintf('save snapshot%d.mat',it);
+        eval(cmd);
     end
     
     Vfmax=2*max(v(FaultIglob))+Vpl;  % compute Vfmax used a lot in OUTPUT
