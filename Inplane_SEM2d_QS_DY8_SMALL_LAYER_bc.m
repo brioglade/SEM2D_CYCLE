@@ -534,11 +534,16 @@ for ex = 1:NELX
        end
     end        
 end
-v(FaultIglobBC,:) = 0;
 
+v(FaultIglobBC,:) = 0;
+v(FaultNIglob,:) = 0;
+v(FaultIglob,2) = 0;
+[vnew,~]=myPCGnew4(coefint1,coefint2,Kdiag,0*v,v,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,BcTopIglob, x,y);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% START OF TIME LOOP %%%%%%%%%%%%%%%%%%%%%%%%%
-
+v(FaultNIglob,:) = vnew(FaultNIglob,:);
+v(FaultIglob,2) = vnew(FaultIglob,2);
 end
 
 if restart
@@ -587,7 +592,6 @@ while t < tmax,
     [dnew,n1(p1)]=myPCGnew4(coefint1,coefint2,Kdiag,dnew,F,FaultIglob,...
         FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,BcTopIglob, x,y);
     
-   
     % update displacement of medium
     d(FaultNIglob,:) = dnew(FaultNIglob,:);
     d(FaultIglob, 2) = dnew(FaultIglob,2);
@@ -644,8 +648,13 @@ while t < tmax,
     
     v(FaultIglob,1) = 0.5*Vf1-0.5*Vpl;
     v(FaultNIglob,:) = (d(FaultNIglob,:)-dPre(FaultNIglob,:))/dt;
-    v(FaultNIglob,:) = 2*v(FaultNIglob,:) -  vPre(FaultNglob,:);
-    
+%    v(FaultNIglob,:) = 2*v(FaultNIglob,:) -  vPre(FaultNglob,:);
+    max(abs(v(BcTopIglob,1)))
+    max(abs(d(BcTopIglob,1)))
+    max(abs(dPre(BcTopIglob,1)))
+    max(abs(vPre(BcTopIglob,1)))
+
+
 %    plot(x(FaultIglob), log10(v(FaultIglob,1)));
 %    hold off
     figure(5)
@@ -665,9 +674,9 @@ while t < tmax,
     
     d(FaultIglobBC,:) = 0;
     v(FaultIglobBC,:) = 0;
-    if(it == 759)
-        stop;
-    end
+%    if(it == 759)
+%        stop;
+%    end
     %hold on
     else  %%%%%%%%%%%%%%%% if max slip rate < 10^-2 m/s %%%%%%%%%%%%%%%%%%% 
     display('Dynamic solver');
