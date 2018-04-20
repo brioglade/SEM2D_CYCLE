@@ -31,7 +31,7 @@ IDstate = 2;
 distN = 1000;
 NSIZE = 2;
 LX = NSIZE*45e3/distN;
-LY = NSIZE*30e3/distN;
+LY = NSIZE*30e3/distN/2;
 
 yr2sec = 365*24*60*60;
 tevent = 197392769.833719193;  % target event time (s)
@@ -48,7 +48,7 @@ end
 %st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
-st_node_space = '3_4';  NELX = 9; NELY = 6; P = 4; 
+st_node_space = '3_4';  NELX = 15; NELY = 5; P = 4; 
 
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
@@ -61,7 +61,7 @@ NGLL = P+1; % number of GLL nodes per element
 %[iglob,x,y] = MeshBox(LX,LY,NELX,NELY,NGLL);
 
 XGLL = GetGLL(NGLL);   % local cordinate of GLL quadrature points
-periodical = false;
+periodical = true;
 
 iglob = zeros(NGLL,NGLL,NELX*NELY);	% local to global index mapping
 nglob = (NELX*(NGLL-1)+(~periodical)*1)*(NELY*(NGLL-1)+1);	% number of global nodes
