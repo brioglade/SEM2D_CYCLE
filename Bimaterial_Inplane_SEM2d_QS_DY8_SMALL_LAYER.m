@@ -671,7 +671,7 @@ end
 while t < tmax,
     dt
     it = it + 1;
-  %  t = t + dt;
+    t = t + dt;
     time(it) = t;
     
         v_store = v;
@@ -730,8 +730,8 @@ while t < tmax,
      help1 = exp(help+fa);
      help2 = exp(help-fa);
      Vf1 = Vo.*(help1 - help2);   
-     dt1 = dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,Vf1,isolver);  
-     display(['dt correction:',num2str(dt1)]);   
+ %    dt1 = dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,Vf1,isolver);  
+%     display(['dt correction:',num2str(dt1)]);   
         %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
         % compute shear stress
         %tau1(j) =tauAB(j) -  tauo(j);   
@@ -744,26 +744,20 @@ while t < tmax,
     
 
     [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt1);
-    
-    %vnew(FaultIglob(:,1),1) = vnew(FaultIglob(:,2),1) + Vpl; % this is enforced 
-    %in the previous PCG solver;
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt);
+
     
     % update displacement of medium
     % to ensure second order accuracy;
-    d = dPre + 0.5*dt1*(vnew + vPre); 
+    d = dPre + 0.5*dt*(vnew + vPre); 
     a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);
     tau1 =0.5 * ( -a(FaultIglob(:,1),1) + a(FaultIglob(:,2),1))./FaultB;
     %generate new prediction for tau and sigma;
     sigma1 = 0.5 * ( a(FaultIglob(:,1),2) - a(FaultIglob(:,2),2))./FaultB;
- %   d(FaultIglob(:,1),2) = dnew(FaultIglob(:,1),2);
     Vf = (Vf + Vf1)/2;
     v = vnew;
-%    Vf = abs(v(FaultIglob1(:,1),1) - v(FaultIglob1(:,2),1)) + Vpl;
     end
     %[n1(1) n1(2)]
-    dt = dt1;
-    t = t+dt;
     psi = psi1;
     tau = tau1;
    
@@ -989,7 +983,7 @@ while t < tmax,
         eval(cmd);
     end
    
-     Vfmax=2*max(v(FaultIglob,1))+Vpl;  % compute Vfmax used a lot in OUTPUT
+     Vfmax=max(v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1))  + Vpl;  % compute Vfmax used a lot in OUTPUT
 %         
 %     % Output variables at 0km, 3km, 6km and 9km for every time step
 %     Vloc1(it) = 2*v(OUTiglobLoc1) + Vpl;
@@ -1279,7 +1273,7 @@ while t < tmax,
     end
     
     % compute next time step dt
-    [dt]=dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
+    [dt]=dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,(v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1))  + Vpl,isolver);
     
 end % ... of time loop
 
