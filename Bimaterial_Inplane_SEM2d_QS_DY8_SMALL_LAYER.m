@@ -7,11 +7,12 @@
 % a = 0.0144
 % b = 0.0191
 % L = 42 mm
-normalstresscoupling = true;
-bimaterial = true;
+
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
+normalstresscoupling = true;
+bimaterial = true;
 bound = 100;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
