@@ -7,7 +7,8 @@
 % a = 0.0144
 % b = 0.0191
 % L = 42 mm
-
+normalstresscoupling = true;
+bimaterial = true;
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
@@ -212,9 +213,17 @@ for ey=1:NELY,
         
         %**** Set here the physical properties of the heterogeneous medium : ****
         if (ey <= NELY_left)  % modified for layer case
+            if(bimaterial)
+                VS = VS1;
+                VP = VP1;
+            else
+                VS = VS2;
+                VP = VP2;
+            end
+           
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS2^2;
-        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS^2;
+        ld(:,:)  = RHO* VP^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
         mu(:,:)  = RHO* VS2^2;   
@@ -731,7 +740,7 @@ while t < tmax,
  %           sigma1 = sigma1 - 0.01*dudx2(sigma1,H,Ht,wgll);
  %    end
      tauAB = tauo + tau1;
-     fa = tauAB./((Seff+0*sigma1).*cca);
+     fa = tauAB./((Seff+normalstresscoupling*sigma1).*cca);
      help = -(fo+ccb.*psi1)./cca;
      help1 = exp(help+fa);
      help2 = exp(help-fa);
@@ -874,7 +883,7 @@ while t < tmax,
      
         % N-R search
         tauNR(j) = tau(j) + tauo(j);
-        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+0*sigma1(j),...
+        [Vf1(j),tau1(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+normalstresscoupling*sigma1(j),...
             tauNR(j),tauo(j),psi1(j),FaultZ(j),FaultVFree(j,1));
         if Vf(j) > 10^10 || isnan(Vf(j)) == 1 || isnan(tau1(j)) == 1 
             'NR search failed!'
@@ -897,7 +906,7 @@ while t < tmax,
                 exp(-0.5*abs(Vf1(j)+Vf(j)).*dt./xLf(j)).*psi(j) + log(Vo(j)./(0.5*abs(Vf1(j)+Vf(j))));
         end
         % N-R search (2nd loop)
-        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+0*sigma1(j),...
+        [Vf2(j),tau2(j)]=NRsearch_NEW(fo(j),Vo(j),cca(j),ccb(j),Seff(j)+normalstresscoupling*sigma1(j),...
             tau1(j),tauo(j),psi2(j),FaultZ(j),FaultVFree(j));
 
     end
