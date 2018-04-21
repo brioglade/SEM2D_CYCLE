@@ -13,6 +13,14 @@ if ~restart
 clearvars -except restart; close all;
 normalstresscoupling = false;
 bimaterial = false;
+parallel = true;
+
+if(parallel)
+    parpool('local',10);
+    PCG = @myPCGnew7_parallel;
+else
+    PCG = @myPCGnew7;
+end
 bound = 100;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
@@ -51,7 +59,7 @@ st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
 %st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
-
+errorbound = 100.0;
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
 NELY_left = NELY/2;
@@ -662,8 +670,9 @@ v(FaultIglobBC(:,1),:) = 0;
 v(FaultIglobBC(:,2),:) = 0;
 FixBoundary = [BcTopIglob',BcBotIglob',FaultIglobBC(:)'];
 %recalculate the slip velocity due to bimaterial effect ( asymmetry).
-[v,~]=myPCGnew7(coefint1,coefint2,Kdiag,v,zeros(nglob,2),Vf,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1.0);
+    
+[v,~]=PCG(coefint1,coefint2,Kdiag,v,zeros(nglob,2),Vf,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,errorbound);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%% START OF TIME LOOP %%%%%%%%%%%%%%%%%%%%%%%%%
@@ -748,8 +757,8 @@ while t < tmax,
      Vf1 = Vo.*(help1 - help2);   
 
 
-    [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt);
+    [vnew,n1(p1)]=PCG(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,errorbound/dt);
 
     
     % update displacement of medium
@@ -1282,10 +1291,10 @@ while t < tmax,
     
     if(trans)
         %during a transition, all quantities need to be consistent 
-        [dnew,~]=myPCGnew7(coefint1,coefint2,Kdiag,d,F,d(FaultIglob(:,1),1)-d(FaultIglob(:,2),1),FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1);
-        [vnew,~]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,v(FaultIglob(:,1),1)-v(FaultIglob(:,2),1),FaultIglob,...
-        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1);
+        [dnew,~]=PCG(coefint1,coefint2,Kdiag,d,F,d(FaultIglob(:,1),1)-d(FaultIglob(:,2),1),FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,errorbound);
+        [vnew,~]=PCG(coefint1,coefint2,Kdiag,v,F,v(FaultIglob(:,1),1)-v(FaultIglob(:,2),1),FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,errorbound);
         d = dnew;
         v = vnew;
         a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);  
