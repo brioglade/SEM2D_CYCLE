@@ -608,11 +608,11 @@ while t < tmax,
     
     % compute the forcing term F
     F(:,:) = 0;
-    F(FaultIglob,:) = dPre(FaultIglob,:) + v(FaultIglob,:)*dt;
+    F(FaultIglob,1) = dPre(FaultIglob,1) + v(FaultIglob,1)*dt;
     
     % assign previous solution of the disp field as an initial guess
     dnew = d(FaultNIglob,:);
-    
+    dnew(FaultIglob,2) = d(FaultIglob,2);   
 
     [dnew,n1(p1)]=myPCGnew3(coefint1,coefint2,diagKnew,dnew,F,FaultIglob,...
         FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,BcTopIglob, x,y);

@@ -1256,8 +1256,12 @@ while t < tmax,
     end
     
     % Determine quasi-static or dynamic regime based on max slip velocity
+    trans  = false;
     if (isolver == 1 && Vfmax < 5*10^-3) || ...
             (isolver == 2 && Vfmax < 2*10^-3)
+        if(isolver == 2)
+            trans = true;
+        end
        isolver = 1;
     else
        isolver = 2;
@@ -1266,6 +1270,22 @@ while t < tmax,
     % compute next time step dt
     [dt]=dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,(v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1))  + Vpl,isolver);
     
+    if(trans)
+        %during a transition, all quantities need to be consistent 
+        [dnew,~]=myPCGnew7(coefint1,coefint2,Kdiag,d,F,d(FaultIglob(:,1),1)-d(FaultIglob(:,2),1),FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1);
+        [vnew,~]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,v(FaultIglob(:,1),1)-v(FaultIglob(:,2),1),FaultIglob,...
+        FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1);
+        d = dnew;
+        v = vnew;
+        a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);  
+        tau = 0.5 * (a(FaultIglob(:,2),1) - a(FaultIglob(:,1),1))./(FaultB);
+        sigma = - 0.5 * (a(FaultIglob(:,2),2) - a(FaultIglob(:,1),2))./(FaultB);
+        
+    end
+       
+        
+        
 end % ... of time loop
 
 %%%%%%%%%%%%%%%%%%%%%%%% Saving the information %%%%%%%%%%%%%%%%%%%%%%%%
