@@ -11,8 +11,8 @@
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
-normalstresscoupling = true;
-bimaterial = true;
+normalstresscoupling = false;
+bimaterial = false;
 bound = 100;
 %%%%%%%%%%% Initial Conditions and state variable evolution %%%%%%%%%%%%%%%
 
@@ -47,10 +47,10 @@ end
    
 %%% Note: I use st_node_space = '3_16' in the paper
 %st_node_space = '1_8';  NELX = 90; NELY = 60; P = 4;
-%st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
+st_node_space = '3_16'; NELX = 60; NELY = 40; P = 4;
 %st_node_space = '1_4';  NELX = 45; NELY = 30; P = 4; 
 %st_node_space = '3_8';  NELX = 30; NELY = 20; P = 4; 
-st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
+%st_node_space = '3_4';  NELX = 15; NELY = 10; P = 4; 
 
 NELX = NELX*NSIZE;
 NELY = NELY*NSIZE;
