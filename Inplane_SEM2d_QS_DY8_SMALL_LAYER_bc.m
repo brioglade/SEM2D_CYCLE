@@ -552,9 +552,9 @@ if restart
     a = a_store;
     psi=psi_store;
     [dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
+else
+[dt]=dtevol(0.1,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
 end
-[dt]=dtevol(0.001,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,2*v(FaultIglob)+Vpl,isolver);
-
 while t < tmax,
     dt
     it = it + 1;

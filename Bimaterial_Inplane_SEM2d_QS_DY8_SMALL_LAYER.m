@@ -213,8 +213,8 @@ for ey=1:NELY,
         %**** Set here the physical properties of the heterogeneous medium : ****
         if (ey <= NELY_left)  % modified for layer case
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS1^2;
-        ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS2^2;
+        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
         mu(:,:)  = RHO* VS2^2;   
@@ -425,6 +425,7 @@ elseif IDintitCond == 2
     isel4 = find(xcoord<=-8e3/distN&xcoord>=-(8e3/distN+width/2));
     ccb(isel4)=Amplitude2 + Amplitude3*cos(2*pi*(xcoord(isel4)+8e3)/width);
     tau = repmat(0,FaultNglob,1);
+    sigma = repmat(0,FaultNglob,1);
     psi = tauo./(Seff.*ccb) - fo./ccb - (cca./ccb).*log(abs(v(FaultIglob(:,2))-v(FaultIglob(:,1)))./Vo);
     psi0 = psi;
 
@@ -624,7 +625,7 @@ Vf = v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1);
 iFBC = find(abs(FaultX)>=bound*10^3/distN);
 NFBC = length(iFBC);
 Vf(iFBC,:) = 0;
-
+Vf1 = 0*Vf;
 FaultIglobBC = zeros(NFBC,2);
 jj = 1;
 for ex = 1:NELX 
@@ -688,12 +689,17 @@ while t < tmax,
     vPre = v;
     dPre = d;
     
-    
+    Vf0 = v(FaultIglob(:,1),1) - v(FaultIglob(:,2),1) + Vpl;
+    Vf = Vf0;
     
     tau1 = tau;
+    sigma1 = sigma;
     for p1=1:2
-        
-        
+
+     a = computeforce(iglob,W,Wl,H,Ht,v,coefint1,coefint2); %compute differential stress caused by v
+     tau1 = tau + 0.5 * (a(FaultIglob(:,2),1) - a(FaultIglob(:,1),1))./(FaultB) * dt; 
+     sigma1 = sigma - 0.5 * (a(FaultIglob(:,2),2) - a(FaultIglob(:,1),2))./(FaultB) * dt; 
+     d = dPre + v * dt;
         %first step calculate vslip
      for jF=1:FaultNglob
         j = jF ;
@@ -717,31 +723,20 @@ while t < tmax,
             end
         end
      end
-     for is = 1:1:1
-        psi1 = psi1 - 0.01*dudx2(psi1,H,Ht,wgll);
-     end
-     for is = 1:1:1
-            tau1 = tau1 - 0.01*dudx2(tau1,H,Ht,wgll);
-            sigma1 = sigma1 - 0.01*dudx2(sigma1,H,Ht,wgll);
-     end
+ %    for is = 1:1:1
+ %       psi1 = psi1 - 0.01*dudx2(psi1,H,Ht,wgll);
+ %    end
+ %    for is = 1:1:1
+ %           tau1 = tau1 - 0.01*dudx2(tau1,H,Ht,wgll);
+ %           sigma1 = sigma1 - 0.01*dudx2(sigma1,H,Ht,wgll);
+ %    end
      tauAB = tauo + tau1;
      fa = tauAB./((Seff+0*sigma1).*cca);
      help = -(fo+ccb.*psi1)./cca;
      help1 = exp(help+fa);
      help2 = exp(help-fa);
      Vf1 = Vo.*(help1 - help2);   
- %    dt1 = dtevol(dt,dtmax,dtmin,dtincf,XiLf,FaultNglob,NFBC,Vf1,isolver);  
-%     display(['dt correction:',num2str(dt1)]);   
-        %tauAB(j) = Seff(j) * cca(j)*asinh(Vf(j)/(2*Vo(j))*exp((fo(j)+ccb(j)*psi1(j))/cca(j)));
-        % compute shear stress
-        %tau1(j) =tauAB(j) -  tauo(j);   
-    % compute the forcing term F
-    %F(FaultIglob(:,1),1) = -tau1.*FaultB;
-    %F(FaultIglob(:,2),1) = tau1.*FaultB;
-    %F(FaultIglob(:,2),2) = 0;
-    % assign previous solution of the disp field as an initial guess
-    %dnew = d;
-    
+
 
     [vnew,n1(p1)]=myPCGnew7(coefint1,coefint2,Kdiag,v,F,Vf1-Vpl,FaultIglob,...
         FaultNIglob,H,Ht,iglob,NEL,nglob,W,Wl,FixBoundary, x,y,1/dt);
@@ -749,19 +744,15 @@ while t < tmax,
     
     % update displacement of medium
     % to ensure second order accuracy;
-    d = dPre + 0.5*dt*(vnew + vPre); 
-    a = computeforce(iglob,W,Wl,H,Ht,d,coefint1,coefint2);
-    tau1 =0.5 * ( -a(FaultIglob(:,1),1) + a(FaultIglob(:,2),1))./FaultB;
-    %generate new prediction for tau and sigma;
-    sigma1 = 0.5 * ( a(FaultIglob(:,1),2) - a(FaultIglob(:,2),2))./FaultB;
-    Vf = (Vf + Vf1)/2;
-    v = vnew;
+    Vf = (Vf0 + Vf1)/2;
+    v = 0.5*(vnew+v);
     end
     %[n1(1) n1(2)]
     psi = psi1;
     tau = tau1;
+    sigma = sigma1;
    
-    
+    v = vnew;
   
     
 %    RHS = a;
