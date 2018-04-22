@@ -13,7 +13,7 @@ if ~restart
 clearvars -except restart; close all;
 normalstresscoupling = false;
 bimaterial = false;
-parallel = true;
+parallel = false;
 
 if(parallel)
     parpool('local',10);
@@ -223,11 +223,11 @@ for ey=1:NELY,
         %**** Set here the physical properties of the heterogeneous medium : ****
         if (ey <= NELY_left)  % modified for layer case
             if(bimaterial)
-                VS = VS1;
-                VP = VP1;
-            else
                 VS = VS2;
                 VP = VP2;
+            else
+                VS = VS1;
+                VP = VP1;
             end
            
         rho(:,:) = RHO;
@@ -235,8 +235,8 @@ for ey=1:NELY,
         ld(:,:)  = RHO* VP^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS2^2;   
-        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS1^2;   
+        ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         end
         if muMax < max(max(mu)); muMax = max(max(mu)); end;
         

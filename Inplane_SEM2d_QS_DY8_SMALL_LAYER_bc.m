@@ -160,8 +160,8 @@ for ey=1:NELY,
         ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         else
         rho(:,:) = RHO;
-        mu(:,:)  = RHO* VS2^2;   
-        ld(:,:)  = RHO* VP2^2 - 2* mu(:,:);
+        mu(:,:)  = RHO* VS1^2;   
+        ld(:,:)  = RHO* VP1^2 - 2* mu(:,:);
         end
         if muMax < max(max(mu)); muMax = max(max(mu)); end;
         
