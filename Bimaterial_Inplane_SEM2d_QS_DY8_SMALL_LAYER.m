@@ -7,12 +7,12 @@
 % a = 0.0144
 % b = 0.0191
 % L = 42 mm
-
+errorbound = 1;
 if ~restart
 %------------------------------------------
 clearvars -except restart; close all;
-normalstresscoupling = false;
-bimaterial = false;
+normalstresscoupling = true;
+bimaterial = true;
 parallel = false;
 
 if(parallel)
@@ -865,7 +865,7 @@ while t < tmax,
     FaultVFree = -( v(FaultIglob(:,2),:) + half_dt*a(FaultIglob(:,2),:)./M(FaultIglob(:,2)) -...   %
                       v(FaultIglob(:,1),:) - half_dt*a(FaultIglob(:,1),:)./M(FaultIglob(:,1)) );
     % compute state variable using Vf from the previous time step
-    sigma1 = (a(FaultIglob(:,1),2)./M(FaultIglob(:,1)) - a(FaultIglob(:,2),2)./M(FaultIglob(:,2))).*FaultZ*half_dt;
+    sigma1 = -(a(FaultIglob(:,1),2)./M(FaultIglob(:,1)) - a(FaultIglob(:,2),2)./M(FaultIglob(:,2))).*FaultZ*half_dt;
     
     Vf = (vPre(FaultIglob(:,1),1) - vPre(FaultIglob(:,2),1))  + Vpl;
 
